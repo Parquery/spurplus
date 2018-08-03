@@ -17,7 +17,7 @@ with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='spurplus',
-    version='1.1.0',
+    version='1.1.1',
     description='Helps you manage remote machines via SSH.',
     long_description=long_description,
     url='https://bitbucket.org/parqueryopen/spurplus',

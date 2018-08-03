@@ -1,3 +1,7 @@
+1.1.2
+=====
+* Fixed identifier for py.typed in setup.py
+
 1.1.1
 =====
 * Moved from bitbucket.com to github.com

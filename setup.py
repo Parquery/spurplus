@@ -17,7 +17,7 @@ with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='spurplus',
-    version='1.1.1',
+    version='1.1.2',
     description='Helps you manage remote machines via SSH.',
     long_description=long_description,
     url='https://bitbucket.org/parqueryopen/spurplus',
@@ -37,5 +37,5 @@ setup(
         'test': ['tox>=3.0.0']
     },
     py_modules=['spurplus'],
-    package_data={"temppathlib": ["py.typed"]}
+    package_data={"spurplus": ["py.typed"]}
 )

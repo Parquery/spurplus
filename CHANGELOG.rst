@@ -1,3 +1,8 @@
+1.1.1
+=====
+* Moved from bitbucket.com to github.com
+* Added py.typed to comply with mypy
+
 1.1.0
 =====
 * Added wrappers for stat, chown and chmod

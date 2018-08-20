@@ -2,22 +2,100 @@
 """
 Helps you manage remote machines via SSH.
 """
+import collections
+import hashlib
+import os
+import queue
+import stat as stat_module
 import contextlib
+import enum
 import pathlib
 import shutil
 import socket
 import time
 import uuid
-from typing import Optional, Union, TextIO, BinaryIO, List, Dict
+from typing import Optional, Union, TextIO, BinaryIO, List, Dict, Sequence, Set, Tuple, MutableSequence
 
 import paramiko
 import spur
 import spur.results
 import spur.ssh
+from typing_extensions import Deque
 
 import spurplus.sftp
 
 # pylint: disable=protected-access
+# pylint: disable=too-many-lines
+
+
+class Delete(enum.Enum):
+    """enumerates delete strategies when syncing."""
+    BEFORE = 1
+    AFTER = 2
+
+
+class SyncMap:
+    """
+    represents the MD5s of the files and the set of directories needed to sync remote and local directories.
+
+    All paths are given as relative paths.
+
+    """
+
+    def __init__(self) -> None:
+        self.file_set = set()  # type: Set[pathlib.Path]
+        self.directory_set = set()  # type: Set[pathlib.Path]
+
+
+def _local_sync_map(local_path: pathlib.Path) -> Optional[SyncMap]:
+    """
+    lists all the files and directories beneath the ``local_path``.
+
+    All paths are given as relative paths to the ``local_path``.
+
+    :param local_path: path to a local directory
+    :return: collected sync map of a local directory, or None if the directory does not exist
+    """
+    if not local_path.exists():
+        return None
+
+    if not local_path.is_dir():
+        raise NotADirectoryError("Local path is not a directory: {}".format(local_path))
+
+    file_set = set()  # type: Set[pathlib.Path]
+    directory_set = set()  # type: Set[pathlib.Path]
+    for pth in local_path.glob("**/*"):
+        rel_pth = pth.relative_to(local_path)
+
+        if not pth.is_dir():
+            file_set.add(rel_pth)
+        else:
+            directory_set.add(rel_pth)
+
+    sync_map = SyncMap()
+    sync_map.file_set = file_set
+    sync_map.directory_set = directory_set
+
+    return sync_map
+
+
+class DirectoryDiff:
+    """
+    represents the difference between a local and a remote directory.
+
+    All paths are given as relative.
+
+    """
+
+    def __init__(self) -> None:
+        self.local_only_files = []  # type: List[pathlib.Path]
+        self.identical_files = []  # type: List[pathlib.Path]
+        self.differing_files = []  # type: List[pathlib.Path]
+        self.remote_only_files = []  # type: List[pathlib.Path]
+
+        self.local_only_directories = []  # type: List[pathlib.Path]
+        self.common_directories = []  # type: List[pathlib.Path]
+        self.remote_only_directories = []  # type: List[pathlib.Path]
 
 
 class SshShell:
@@ -26,7 +104,10 @@ class SshShell:
 
     Adds typing and support for pathlib.Path and facilitates common tasks such as md5 sum computation,
     directory creation and providing one-liners for reading/writing files.
+
     """
+
+    # pylint: disable=too-many-public-methods
 
     def __init__(self,
                  spur_ssh_shell: spur.SshShell,
@@ -236,7 +317,7 @@ class SshShell:
 
         return remote_hsh
 
-    def md5s(self, remote_paths: List[Union[str, pathlib.Path]]) -> List[Optional[str]]:
+    def md5s(self, remote_paths: Sequence[Union[str, pathlib.Path]]) -> List[Optional[str]]:
         """
         computes MD5 checksums of multiple remote files individually. It is assumed that md5sum command is available
         on the remote machine.
@@ -444,6 +525,257 @@ class SshShell:
         self.write_bytes(
             remote_path=remote_path, data=data, create_directories=create_directories, consistent=consistent)
 
+    def _remote_sync_map(self, remote_path: pathlib.Path) -> Optional[SyncMap]:
+        """
+        lists all the files and directories beneath the ``remote_path``.
+
+        :param remote_path: path to the remote directory
+        :return: collected sync map, or None if the ``remote_path`` does not exist
+        """
+        a_stat = self.stat(remote_path=remote_path)
+        if a_stat is None:
+            return None
+
+        if not stat_module.S_ISDIR(a_stat.st_mode):
+            raise NotADirectoryError("Remote path is not a directory: {} (mode: {})".format(
+                remote_path, a_stat.st_mode))
+
+        file_set = set()  # type: Set[pathlib.Path]
+        directory_set = set()  # type: Set[pathlib.Path]
+
+        stack = []  # type: List[pathlib.Path]
+        stack.append(remote_path)
+
+        while stack:
+            remote_subpth = stack.pop()
+
+            for attr in self._sftp.listdir_attr(remote_subpth.as_posix()):
+                remote_subsubpth = remote_subpth / attr.filename
+
+                rel_pth = remote_subsubpth.relative_to(remote_path)
+
+                if stat_module.S_ISDIR(attr.st_mode):
+                    stack.append(remote_subsubpth)
+                    directory_set.add(rel_pth)
+                else:
+                    file_set.add(rel_pth)
+
+        sync_map = SyncMap()
+        sync_map.file_set = file_set
+        sync_map.directory_set = directory_set
+
+        return sync_map
+
+    def directory_diff(self, local_path: Union[str, pathlib.Path],
+                       remote_path: Union[str, pathlib.Path]) -> DirectoryDiff:
+        """
+        iterates through the local and the remote directory and computes the diff.
+
+        If one of the directories does not exist, all files are assumed "missing" in that directory.
+
+        The identity of the files is based on MD5 checksums.
+
+        :param local_path: path to the local directory
+        :param remote_path: path to the remote directory
+        :return: difference between the directories
+        """
+        # pylint: disable=too-many-branches
+        if isinstance(local_path, str):
+            local_pth = pathlib.Path(local_path)
+        elif isinstance(local_path, pathlib.Path):
+            local_pth = local_path
+        else:
+            raise ValueError("Unexpected type of local_path: {}".format(type(local_path)))
+
+        if isinstance(remote_path, str):
+            remote_pth = pathlib.Path(remote_path)
+        elif isinstance(remote_path, pathlib.Path):
+            remote_pth = remote_path
+        else:
+            raise ValueError("Unexpected type of remote_path: {}".format(type(remote_path)))
+
+        local_map = _local_sync_map(local_path=local_pth)
+        remote_map = self._remote_sync_map(remote_path=remote_pth)
+
+        if local_map is None and remote_map is None:
+            raise FileNotFoundError("Both the local and the remote path do not exist: {} and {}".format(
+                local_pth, remote_pth))
+
+        if local_map is None:
+            result = DirectoryDiff()
+            result.remote_only_files = sorted(remote_map.file_set)
+            result.remote_only_directories = sorted(remote_map.directory_set)
+            return result
+
+        if remote_map is None:
+            result = DirectoryDiff()
+            result.local_only_files = sorted(local_map.file_set)
+            result.local_only_directories = sorted(local_map.directory_set)
+            return result
+
+        result = DirectoryDiff()
+        result.local_only_files = sorted(local_map.file_set.difference(remote_map.file_set))
+        result.local_only_directories = sorted(local_map.directory_set.difference(remote_map.directory_set))
+
+        result.remote_only_files = sorted(remote_map.file_set.difference(local_map.file_set))
+
+        result.remote_only_directories = sorted(remote_map.directory_set.difference(local_map.directory_set))
+
+        result.common_directories = sorted(remote_map.directory_set.intersection(local_map.directory_set))
+
+        # compare the files
+        common_files = sorted(local_map.file_set.intersection(remote_map.file_set))
+
+        local_md5s = []
+        for rel_pth in common_files:
+            local_md5s.append(hashlib.md5((local_pth / rel_pth).read_bytes()))
+
+        remote_md5s = self.md5s(remote_paths=[remote_pth / rel_pth for rel_pth in common_files])
+
+        for rel_pth, local_md5, remote_md5 in zip(common_files, local_md5s, remote_md5s):
+            if local_md5 != remote_md5:
+                result.differing_files.append(rel_pth)
+            else:
+                result.identical_files.append(rel_pth)
+
+        return result
+
+    def sync_to_remote(self,
+                       local_path: Union[str, pathlib.Path],
+                       remote_path: Union[str, pathlib.Path],
+                       consistent: bool = True,
+                       delete: Optional[Delete] = None,
+                       preserve_permissions: bool = False) -> None:
+        """
+        syncs all the files beneath the ``local_path`` to ``remote_path``.
+
+        Both local path and remote path are directories. If the ``remote_path`` does not exist, it is created. The
+        files are compared with MD5 first and only the files whose MD5s mismatch are copied.
+
+        Mind that the directory lists and the mapping (path -> MD5) needs to fit in memory for both the local path and
+        the remote path.
+
+        :param local_path: path to the local directory
+        :param remote_path: path to the remote directory
+        :param consistent: if set, writes to a temporary remote file first on each copy, and then renames it.
+        :param delete:
+            if set, files and directories missing in ``local_path`` and existing in ``remote_path`` are deleted.
+        :param preserve_permissions:
+            if set, the remote files and directories are chmod'ed to reflect the local files and directories,
+            respectively.
+        :return:
+        """
+        # pylint: disable=too-many-arguments
+        # pylint: disable=too-many-branches
+        if isinstance(local_path, str):
+            local_pth = pathlib.Path(local_path)
+        elif isinstance(local_path, pathlib.Path):
+            local_pth = local_path
+        else:
+            raise ValueError("Unexpected type of local_path: {}".format(type(local_path)))
+
+        if not local_pth.exists():
+            raise FileNotFoundError("Local path does not exist: {}".format(local_pth))
+
+        if not local_pth.is_dir():
+            raise NotADirectoryError("Local path is not a directory: {}".format(local_pth))
+
+        if isinstance(remote_path, str):
+            remote_pth = pathlib.Path(remote_path)
+        elif isinstance(remote_path, pathlib.Path):
+            remote_pth = remote_path
+        else:
+            raise ValueError("Unexpected type of remote_path: {}".format(type(remote_path)))
+
+        dir_diff = self.directory_diff(local_path=local_pth, remote_path=remote_pth)
+
+        if delete is not None and delete == Delete.BEFORE:
+            for rel_pth in dir_diff.remote_only_files:
+                try:
+                    self._sftp.remove(path=(remote_pth / rel_pth).as_posix())
+                except FileNotFoundError as err:
+                    raise FileNotFoundError("Failed to remove the file since it does not exist: {}".format(
+                        remote_pth / rel_pth)) from err
+                except OSError as err:
+                    raise OSError("Failed to remove the file: {}".format(remote_pth / rel_pth)) from err
+
+            for rel_pth in dir_diff.remote_only_directories:
+                self.remove(remote_path=remote_pth / rel_pth, recursive=True)
+
+        # Create directories missing on the remote
+        for rel_pth in dir_diff.local_only_directories:
+            self.mkdir(remote_path=remote_pth / rel_pth)
+
+        for rel_pths in [dir_diff.local_only_files, dir_diff.differing_files]:
+            for rel_pth in rel_pths:
+                self.put(
+                    local_path=local_pth / rel_pth,
+                    remote_path=remote_pth / rel_pth,
+                    create_directories=False,
+                    consistent=consistent)
+
+        if preserve_permissions:
+            for rel_pths in [dir_diff.local_only_directories, dir_diff.common_directories]:
+                self.mirror_local_permissions(relative_paths=rel_pths, local_path=local_pth, remote_path=remote_pth)
+
+            for rel_pths in [dir_diff.local_only_files, dir_diff.identical_files, dir_diff.differing_files]:
+                self.mirror_local_permissions(relative_paths=rel_pths, local_path=local_pth, remote_path=remote_pth)
+
+        if delete is not None and delete == Delete.AFTER:
+            for rel_pth in dir_diff.remote_only_files:
+                try:
+                    self._sftp.remove(path=(remote_pth / rel_pth).as_posix())
+                except FileNotFoundError as err:
+                    raise FileNotFoundError("Failed to remove the file since it does not exist: {}".format(
+                        remote_pth / rel_pth)) from err
+                except OSError as err:
+                    raise OSError("Failed to remove the file: {}".format(remote_pth / rel_pth)) from err
+
+            for rel_pth in dir_diff.remote_only_directories:
+                self.remove(remote_path=remote_pth / rel_pth, recursive=True)
+
+    def mirror_local_permissions(self, relative_paths: Sequence[Union[str, pathlib.Path]],
+                                 local_path: Union[str, pathlib.Path], remote_path: Union[str, pathlib.Path]) -> None:
+        """
+        sets the permissions of the remote files to be the same as the permissions of the local files.
+
+        The files are given as relative paths and are expected to exist both beneath ``local_path`` and
+        beneath ``remote_path``.
+
+        :param relative_paths: relative paths of files whose permissions are changed
+        :param local_path: path to the local directory
+        :param remote_path: path to the remote directory
+        :return:
+        """
+        if isinstance(local_path, str):
+            local_pth = pathlib.Path(local_path)
+        elif isinstance(local_path, pathlib.Path):
+            local_pth = local_path
+        else:
+            raise ValueError("Unexpected type of local_path: {}".format(type(local_path)))
+
+        if not local_pth.exists():
+            raise FileNotFoundError("Local path does not exist: {}".format(local_pth))
+
+        if not local_pth.is_dir():
+            raise NotADirectoryError("Local path is not a directory: {}".format(local_pth))
+
+        if isinstance(remote_path, str):
+            remote_pth = pathlib.Path(remote_path)
+        elif isinstance(remote_path, pathlib.Path):
+            remote_pth = remote_path
+        else:
+            raise ValueError("Unexpected type of remote_path: {}".format(type(remote_path)))
+
+        if not self.is_dir(remote_path=remote_path):
+            raise NotADirectoryError("Remote path is not a directory: {}".format(remote_pth))
+
+        for rel_pth in relative_paths:
+            local_file_pth = local_pth / rel_pth
+            remote_file_pth = remote_pth / rel_pth
+
+            self.chmod(remote_path=remote_file_pth, mode=local_file_pth.stat().st_mode)
+
     def get(self,
             remote_path: Union[str, pathlib.Path],
             local_path: Union[str, pathlib.Path],
@@ -563,6 +895,66 @@ class SshShell:
         """
         spurplus.sftp._mkdir(sftp=self._sftp, remote_path=remote_path, mode=mode, parents=parents, exist_ok=exist_ok)
 
+    def remove(self, remote_path: Union[str, pathlib.Path], recursive: bool = False) -> None:
+        """
+        removes a file.
+
+        :param remote_path: to a file or a directory
+        :param recursive:
+            if set, removes the directory recursively. This parameter has no effect if remote_path is not a directory.
+        :return:
+        """
+        a_stat = self.stat(remote_path=remote_path)
+        if a_stat is None:
+            raise FileNotFoundError("Remote file does not exist and thus can not be removed: {}".format(remote_path))
+
+        if not stat_module.S_ISDIR(a_stat.st_mode):
+            self._sftp.remove(str(remote_path))
+            return
+
+        if not recursive:
+            attrs = self._sftp.listdir_attr(str(remote_path))
+
+            if len(attrs) > 0:
+                raise OSError(
+                    "The remote directory is not empty and the recursive flag was not set: {}".format(remote_path))
+
+            self._sftp.rmdir(str(remote_path))
+            return
+
+        # Remove all files in the first step, then remove all the directories in a second step
+        stack1 = []  # type: List[str]
+        stack2 = []  # type: List[str]
+
+        # First step: remove all files
+        stack1.append(str(remote_path))
+
+        while stack1:
+            pth = stack1.pop()
+            stack2.append(pth)
+
+            for attr in self._sftp.listdir_attr(pth):
+                subpth = os.path.join(pth, attr.filename)
+
+                if stat_module.S_ISDIR(attr.st_mode):
+                    stack1.append(subpth)
+                else:
+                    try:
+                        self._sftp.remove(path=subpth)
+                    except OSError as err:
+                        raise OSError("Failed to remove the remote file while recursively removing {}: {}".format(
+                            remote_path, subpth)) from err
+
+        # Second step: remove all directories
+        while stack2:
+            pth = stack2.pop()
+
+            try:
+                self._sftp.rmdir(path=pth)
+            except OSError as err:
+                raise OSError("Failed to remove the remote directory while recursively removing {}: {}".format(
+                    remote_path, pth)) from err
+
     def chmod(self, remote_path: Union[str, pathlib.Path], mode: int) -> None:
         """
         changes the permission mode of the file.
@@ -571,7 +963,10 @@ class SshShell:
         :param mode: permission mode
         :return:
         """
-        self._sftp.chmod(path=str(remote_path), mode=mode)
+        try:
+            self._sftp.chmod(path=str(remote_path), mode=mode)
+        except FileNotFoundError as err:
+            raise FileNotFoundError("Remote file to be chmod'ed does not exist: {}".format(remote_path)) from err
 
     def stat(self, remote_path: Union[str, pathlib.Path]) -> Optional[paramiko.SFTPAttributes]:
         """
@@ -587,6 +982,54 @@ class SshShell:
             pass
 
         return result
+
+    def is_dir(self, remote_path: Union[str, pathlib.Path]) -> bool:
+        """
+        checks whether the remote path is a directory.
+
+        :param remote_path: path to the remote file or directory
+        :return: True if the remote path is a directory
+        :raise: FileNotFound if the remote path does not exist
+        """
+        a_stat = self.stat(remote_path=remote_path)
+        if a_stat is None:
+            raise FileNotFoundError("Remote file does not exist: {}".format(remote_path))
+
+        return stat_module.S_ISDIR(a_stat.st_mode)
+
+    def is_symlink(self, remote_path: Union[str, pathlib.Path]) -> bool:
+        """
+        checks whether the remote path is a symlink.
+
+        :param remote_path: path to the remote file or directory
+        :return: True if the remote path is a directory
+        :raise: FileNotFound if the remote path does not exist
+        """
+        try:
+            a_lstat = self._sftp.lstat(path=str(remote_path))
+            return stat_module.S_ISLNK(a_lstat.st_mode)
+
+        except FileNotFoundError as err:
+            raise FileNotFoundError("Remote file does not exist: {}".format(remote_path)) from err
+
+    def symlink(self, source: Union[str, pathlib.Path], destination: Union[str, pathlib.Path]) -> None:
+        """
+        creates a symbolic link to the ``source`` remote path at ``destination``.
+
+        :param source: remote path to the source
+        :param destination: remote path where to store the symbolic link
+        :return:
+        """
+        try:
+            self._sftp.lstat(str(destination))
+            raise FileExistsError("The destination of the symbolic link already exists: {}".format(destination))
+        except FileNotFoundError:
+            pass
+
+        try:
+            self._sftp.symlink(source=str(source), dest=str(destination))
+        except OSError as err:
+            raise OSError("Failed to create the symbolic link to {} at {}".format(source, destination)) from err
 
     def chown(self, remote_path: Union[str, pathlib.Path], uid: int, gid: int) -> None:
         """

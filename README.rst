@@ -2,6 +2,7 @@ Spur+
 =====
 
 Spur+ builds on top of Spur_ library to help you manage the remote machines running a common Linux distribution via SSH.
+
 While we already find that Spur_ provides most of the functionality out-of-the-box, we missed certain features:
 
 - typing. Since spur supports both Python 2 and 3, it does not provide any type annotations which makes it harder to use
@@ -11,32 +12,34 @@ While we already find that Spur_ provides most of the functionality out-of-the-b
   provides support for both.
 
 - a function for creating directories. spur relies on sftp client. While it is fairly straightforward to get an sftp
-  client from `spur.SshShell` and create a directory, we think that it merits a wrapper function akin to
-  `pathlib.Path.mkdir()` provided how often this functionality is needed.
+  client from ``spur.SshShell`` and create a directory, we think that it merits a wrapper function akin to
+  ``pathlib.Path.mkdir()`` provided how often this functionality is needed.
 
-- reading/writing text and binary data in one go. Similarly to creating directories, `spur.SshShell.open()` already
+- reading/writing text and binary data in one go. Similarly to creating directories, ``spur.SshShell.open()`` already
   provides all the functionality you need to read/write files. However, we found the usage code to be more readable when
   written in one line and no extra variables for file descriptors are introduced.
 
 - a function for putting and getting files to/from the remote host, respectively.
+
+- a function to sync a local directory to a remote directory (similar to ``rsync``).
 
 - a function for computing MD5 checksums.
 
 - a function to check if a file exists.
 
 - a more elaborate context manager for a temporary directory which allows for specifying prefix, suffix and
-  base directory and gives you a pathlib.Path. In contrast, `spur.temporary_directory()` gives you only a string with
+  base directory and gives you a pathlib.Path. In contrast, ``spur.temporary_directory()`` gives you only a string with
   no knobs.
 
 - an initializer function to repeatedly re-connect on connection failure. We found this function particularly important
   when you spin a virtual instance in the cloud and need to wait for it to initialize.
 
-- a wrapper around paramiko's SFTP client (`spurplus.sftp.ReconnectingSFTP`) to automatically reconnect if the SFTP
-  client experienced a connection failure. While original `spur.SshShell.open()` creates a new SFTP client on every
+- a wrapper around paramiko's SFTP client (``spurplus.sftp.ReconnectingSFTP``) to automatically reconnect if the SFTP
+  client experienced a connection failure. While original ``spur.SshShell.open()`` creates a new SFTP client on every
   call in order to prevent issues with time-outs, `spurplus.SshShell` is able to re-use the SFTP client over multiple
-  calls via `spurplus.sftp.ReconnectingSFTP`.
+  calls via ``spurplus.sftp.ReconnectingSFTP``.
 
-  This can lead up to 25x speed-up (see the benchmark in `tests/live_test.py`).
+  This can lead up to 25x speed-up (see the benchmark in ``tests/live_test.py``).
 
 .. _Spur: https://github.com/mwilliamson/spur.py
 
@@ -49,29 +52,40 @@ Usage
 
     import spurplus
 
-    # re-try on connection failure; sftp client and the underlying spur SshShell are automatically closed when
-    # shell is closed.
-    with spurplus.connect_with_retries(hostname='some-machine.example.com', username='devop') as shell:
+    # Re-try on connection failure; sftp client and the underlying spur SshShell
+    # are automatically closed when the shell is closed.
+    with spurplus.connect_with_retries(
+            hostname='some-machine.example.com', username='devop') as shell:
         p = pathlib.Path('/some/directory')
 
-        # create a directory
+        # Create a directory
         shell.mkdir(remote_path=p, parents=True, exist_ok=True)
 
-        # write a file
+        # Write a file
         shell.write_text(remote_path=p/'some-file', text='hello world!')
 
-        # read from a file
+        # Read from a file
         text = shell.read_text(remote_path=p/'some-file')
 
-        # change the permissions
+        # Change the permissions
         shell.chmod(remote_path=p/'some-file', mode=0o444)
 
-        # stat the file
+        # Sync a local directory to a remote.
+        # Only differing files are uploaded,
+        # files missing locally are deleted before the transfer and
+        # the permissions are mirrored from the local.
+        sync_to_remote(
+            local_path="/some/local/directory",
+            remote_path="/some/remote/directory",
+            delete=spurplus.Delete.BEFORE,
+            preserve_permissions = True)
+
+        # Stat the file
         print("The stat of {}: {}".format(p/'some-file', shell.stat(p/'some-file')))
 
-        # use a wrapped SFTP client
+        # Use a wrapped SFTP client
         sftp = shell.as_sftp()
-        # do something with the SFTP
+        # Do something with the SFTP
         for attr in sftp.listdir_iter(path=p.as_posix()):
             do_something(attr.filename, attr.st_size)
 
@@ -123,11 +137,11 @@ Development
 * There are live tests for which you need to have a running SSH server. The parameters of the tests
   are passed via environment variables:
 
-    * ``TEST_SSH_HOSTNAME`` (host name of the SSH server, defaults to "127.0.0.1"),
-    * ``TEST_SSH_PORT`` (optional, defaults to 22),
-    * ``TEST_SSH_USERNAME`` (optional, uses paramiko's default),
-    * ``TEST_SSH_PASSWORD`` (optional, uses private key file if not specified) and
-    * ``TEST_SSH_PRIVATE_KEY_FILE`` (optional, looks for private key in expected places if not specified).
+    - ``TEST_SSH_HOSTNAME`` (host name of the SSH server, defaults to "127.0.0.1"),
+    - ``TEST_SSH_PORT`` (optional, defaults to 22),
+    - ``TEST_SSH_USERNAME`` (optional, uses paramiko's default),
+    - ``TEST_SSH_PASSWORD`` (optional, uses private key file if not specified) and
+    - ``TEST_SSH_PRIVATE_KEY_FILE`` (optional, looks for private key in expected places if not specified).
 
 * We use tox for testing and packaging the distribution. Assuming that the above-mentioned environment variables has
   been set, the virutal environment has been activated and the development dependencies have been installed, run:

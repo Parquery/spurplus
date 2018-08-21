@@ -1,5 +1,6 @@
 venv3
 venv
+venv-doc
 .mypy_cache/
 .idea
 *.pyc

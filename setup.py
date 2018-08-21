@@ -35,7 +35,8 @@ setup(
     extras_require={
         'dev':
         ['mypy==0.620', 'pylint==1.8.2', 'yapf==0.20.2', 'tox>=3.0.0', 'temppathlib>=1.0.3,<2', 'coverage>=4.5.1,<5'],
-        'test': ['tox>=3.0.0', 'temppathlib>=1.0.3,<2', 'coverage>=4.5.1,<5']
+        'test': ['tox>=3.0.0', 'temppathlib>=1.0.3,<2', 'coverage>=4.5.1,<5'],
+        'doc': ['sphinx>=1.7.7,<2', 'sphinx-autodoc-typehints>=1.3.0,<2', 'sphinx-rtd-theme>=0.4.1,<1']
     },
     py_modules=['spurplus'],
     package_data={"spurplus": ["py.typed"]})

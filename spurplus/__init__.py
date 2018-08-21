@@ -127,16 +127,20 @@ class SshShell:
 
     def as_spur(self) -> spur.ssh.SshShell:
         """
-        :return: the contained spur.SshShell instance;
-        for example, use the contained SshShell instance if you need undocumented spur functionality.
+        :return:
+            the contained spur.SshShell instance;
+            for example, use the contained SshShell instance if you need undocumented spur functionality.
+
         """
         return self._spur
 
     def as_sftp(self) -> Union[paramiko.SFTP, spurplus.sftp.ReconnectingSFTP]:
         """
-        :return: the contained SFTP client;
-        for example, use this client when you need more fine-grained operations such as retrieving
-        stats of a file.
+        :return:
+            the contained SFTP client;
+            for example, use this client when you need more fine-grained operations such as retrieving
+            stats of a file.
+
         """
         return self._sftp
 
@@ -156,27 +160,34 @@ class SshShell:
 
         :param command: to be executed
         :param cwd: change the current directory to this value before executing the command.
-        :param update_env: environment variables to be set before running the command.
-        If there's an existing environment variable with the same name, it will be overwritten.
-        Otherwise, it is unchanged.
+        :param update_env:
+            environment variables to be set before running the command.
 
-        :param allow_error:  If False, an exception is raised if the return code of the command is anything but 0.
-        If True, a result is returned irrespective of return code.
+            If there's an existing environment variable with the same name, it will be overwritten.
+            Otherwise, it is unchanged.
 
-        :param stdout:  if not None, anything the command prints to standard output during its execution will also be
-        written to stdout using stdout.write.
+        :param allow_error:
+            If False, an exception is raised if the return code of the command is anything but 0.
+            If True, a result is returned irrespective of return code.
 
-        :param stderr: if not None, anything the command prints to standard error during its execution will also be
-        written to stderr using stderr.write.
+        :param stdout:
+            if not None, anything the command prints to standard output during its execution will also be
+            written to stdout using stdout.write.
 
-        :param encoding: if set, this is used to decode any output. By default, any output is treated as raw bytes.
-        If set, the raw bytes are decoded before writing to the passed stdout and stderr arguments (if set) and before
-        setting the output attributes on the result.
+        :param stderr:
+            if not None, anything the command prints to standard error during its execution will also be
+            written to stderr using stderr.write.
+
+        :param encoding:
+            if set, this is used to decode any output. By default, any output is treated as raw bytes.
+            If set, the raw bytes are decoded before writing to the passed stdout and stderr arguments (if set)
+            and before setting the output attributes on the result.
 
         :param use_pty: (undocumented in spur 0.3.20) If set, requests a pseudo-terminal from the server.
 
         :return: execution result
         :raise: spur.results.RunProcessError on an error if allow_error=False
+
         """
         # pylint: disable=too-many-arguments
 
@@ -228,25 +239,32 @@ class SshShell:
 
         :param command: to be executed
         :param cwd: change the current directory to this value before executing the command.
-        :param update_env: environment variables to be set before running the command.
-        If there's an existing environment variable with the same name, it will be overwritten. Otherwise,
-        it is unchanged.
+        :param update_env:
+            environment variables to be set before running the command.
 
-        :param store_pid: if set to True, store the process id of the spawned process as the attribute pid on the
-        returned process object.
+            If there's an existing environment variable with the same name, it will be overwritten. Otherwise,
+            it is unchanged.
 
-        :param allow_error:  If False, an exception is raised if the return code of the command is anything but 0.
-        If True, a result is returned irrespective of return code.
+        :param store_pid:
+            If set to True, store the process id of the spawned process as the attribute pid on the
+            returned process object.
 
-        :param stdout:  if not None, anything the command prints to standard output during its execution will also be
-        written to stdout using stdout.write.
+        :param allow_error:
+            If False, an exception is raised if the return code of the command is anything but 0.
+            If True, a result is returned irrespective of return code.
 
-        :param stderr: if not None, anything the command prints to standard error during its execution will also be
-        written to stderr using stderr.write.
+        :param stdout:
+            If not None, anything the command prints to standard output during its execution will also be
+            written to stdout using stdout.write.
 
-        :param encoding: if set, this is used to decode any output. By default, any output is treated as raw bytes.
-        If set, the raw bytes are decoded before writing to the passed stdout and stderr arguments (if set) and before
-        setting the output attributes on the result.
+        :param stderr:
+            If not None, anything the command prints to standard error during its execution will also be
+            written to stderr using stderr.write.
+
+        :param encoding:
+            If set, this is used to decode any output. By default, any output is treated as raw bytes.
+            If set, the raw bytes are decoded before writing to the passed stdout and stderr arguments (if set) and
+            before setting the output attributes on the result.
 
         :param use_pty: (undocumented in spur 0.3.20) If set, requests a pseudo-terminal from the server.
 
@@ -1080,29 +1098,34 @@ def connect_with_retries(hostname: str,
     :param port: for connection, default is 22
     :param private_key_file: path to the private key file
     :param connect_timeout: a timeout in seconds for establishing an SSH connection. Defaults to 60 (one minute).
-    :param missing_host_key: by default, an error is raised when a host key is missing.
-    One of the following values can be used to change the behaviour when a host key is missing:
+    :param missing_host_key:
+        by default, an error is raised when a host key is missing.
+
+        One of the following values can be used to change the behaviour when a host key is missing:
         * spur.ssh.MissingHostKey.raise_error -- raise an error
         * spur.ssh.MissingHostKey.warn -- accept the host key and log a warning
         * spur.ssh.MissingHostKey.accept -- accept the host key
 
-    :param shell_type: the type of shell used by the host. Defaults to spur.ssh.ShellTypes.sh, which should be
-    appropriate for most Linux distributions. If the host uses a different shell, such as simpler shells often
-    found on embedded systems, try changing shell_type to a more appropriate value,
-    such as spur.ssh.ShellTypes.minimal. The following shell types are currently supported:
+    :param shell_type:
+        the type of shell used by the host. Defaults to spur.ssh.ShellTypes.sh, which should be
+        appropriate for most Linux distributions. If the host uses a different shell, such as simpler shells often
+        found on embedded systems, try changing shell_type to a more appropriate value,
+        such as spur.ssh.ShellTypes.minimal. The following shell types are currently supported:
 
-    * spur.ssh.ShellTypes.sh -- the Bourne shell. Supports all features.
-    * spur.ssh.ShellTypes.minimal -- a minimal shell. Several features are unsupported:
+        * spur.ssh.ShellTypes.sh -- the Bourne shell. Supports all features.
+        * spur.ssh.ShellTypes.minimal -- a minimal shell. Several features are unsupported:
         * Non-existent commands will not raise spur.NoSuchCommandError.
         * The following arguments to spawn and run are unsupported unless set to their default values:
           cwd, update_env, and store_pid.
 
-    :param look_for_private_keys: by default, Spur will search for discoverable private key files in ~/.ssh/.
-    Set to False to disable this behaviour.
+    :param look_for_private_keys:
+        by default, Spur will search for discoverable private key files in ~/.ssh/.
+        Set to False to disable this behaviour.
 
-    :param load_system_host_keys: by default, Spur will attempt to read host keys from the user's known hosts file,
-    as used by OpenSSH, and no exception will be raised if the file can't be read.
-    Set to False to disable this behaviour.
+    :param load_system_host_keys:
+        by default, Spur will attempt to read host keys from the user's known hosts file,
+        as used by OpenSSH, and no exception will be raised if the file can't be read.
+        Set to False to disable this behaviour.
 
     :param sock: an open socket or socket-like object to use for communication to the target host.
 

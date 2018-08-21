@@ -37,5 +37,4 @@ setup(
         'test': ['tox>=3.0.0']
     },
     py_modules=['spurplus'],
-    package_data={"spurplus": ["py.typed"]}
-)
+    package_data={"spurplus": ["py.typed"]})

@@ -8,6 +8,7 @@ addons:
       openssh-server
 install:
   - pip3 install -e .[test]
+  - pip3 install coveralls
   - ssh-keygen -t rsa -N "" -f $HOME/test_id_rsa
   - "echo Test ID rsa is at: $HOME/test_id_rsa"
   - "echo Authorized keys is at: $HOME/.ssh/authorized_keys"
@@ -17,5 +18,5 @@ env:
 script:
   - cat $HOME/.ssh/authorized_keys
   - ssh -v -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $HOME/test_id_rsa $USER@127.0.0.1 -- echo hi
-  - python3 tests/test_spurplus.py
-  - python3 tests/live_test.py
+  - coverage run --source spurplus -m unittest discover tests
+  - coveralls

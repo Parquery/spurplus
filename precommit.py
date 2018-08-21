@@ -195,7 +195,7 @@ def main() -> int:
                 success = False
 
     success = subprocess.call(['python3', '-m', 'unittest', 'discover', (py_dir / 'tests').as_posix()]) == 0 and success
-    success = subprocess.call(['python3', (py_dir / 'tests' / 'live_test.py').as_posix()]) == 0 and success
+    success = subprocess.call(['python3', (py_dir / 'tests' / 'test_live.py').as_posix()]) == 0 and success
 
     if not success:
         print("One or more checks failed.")

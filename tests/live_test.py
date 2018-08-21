@@ -65,15 +65,20 @@ class TestReconnection(unittest.TestCase):
 def set_up() -> spurplus.SshShell:
     """sets up a shell to the testing instance."""
     params = params_from_environ()
-    shell = spurplus.connect_with_retries(
-        hostname=params.hostname,
-        port=params.port,
-        username=params.username,
-        password=params.password,
-        private_key_file=params.private_key_file,
-        missing_host_key=spur.ssh.MissingHostKey.accept,
-        retries=2,
-        retry_period=1)
+
+    try:
+        shell = spurplus.connect_with_retries(
+            hostname=params.hostname,
+            port=params.port,
+            username=params.username,
+            password=params.password,
+            private_key_file=params.private_key_file,
+            missing_host_key=spur.ssh.MissingHostKey.accept,
+            retries=2,
+            retry_period=1)
+    except ConnectionError as err:
+        raise ConnectionError("Failed to connect to {}@{}:{}, private key file: {}, password is not None: {}".format(
+            params.username, params.hostname, params.port, params.private_key_file, params.password is not None))
 
     return shell
 

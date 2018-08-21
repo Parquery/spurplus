@@ -1,5 +1,6 @@
 Spur+
 =====
+.. image:: https://api.travis-ci.com/Parquery/spurplus.svg?branch=master
 
 Spur+ builds on top of Spur_ library to help you manage the remote machines running a common Linux distribution via SSH.
 

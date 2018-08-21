@@ -1,0 +1,21 @@
+language: python
+python:
+  - "3.5"
+  # TODO: add more versions
+addons:
+  apt:
+    packages:
+      openssh-server
+install:
+  - pip3 install -e .[test]
+  - ssh-keygen -t rsa -N "" -f $HOME/test_id_rsa
+  - "echo Test ID rsa is at: $HOME/test_id_rsa"
+  - "echo Authorized keys is at: $HOME/.ssh/authorized_keys"
+  - cat $HOME/test_id_rsa.pub >> $HOME/.ssh/authorized_keys
+env:
+  - TEST_SSH_USERNAME=$USER TEST_SSH_PRIVATE_KEY_FILE=$HOME/test_id_rsa
+script:
+  - cat $HOME/.ssh/authorized_keys
+  - ssh -v -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $HOME/test_id_rsa $USER@127.0.0.1 -- echo hi
+  - python3 tests/test_spurplus.py
+  - python3 tests/live_test.py

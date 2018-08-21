@@ -2,25 +2,22 @@
 """
 Helps you manage remote machines via SSH.
 """
-import collections
-import hashlib
-import os
-import queue
-import stat as stat_module
 import contextlib
 import enum
+import hashlib
+import os
 import pathlib
 import shutil
 import socket
+import stat as stat_module
 import time
 import uuid
-from typing import Optional, Union, TextIO, BinaryIO, List, Dict, Sequence, Set, Tuple, MutableSequence
+from typing import Optional, Union, TextIO, BinaryIO, List, Dict, Sequence, Set
 
 import paramiko
 import spur
 import spur.results
 import spur.ssh
-from typing_extensions import Deque
 
 import spurplus.sftp
 
@@ -366,19 +363,9 @@ class SshShell:
         """
         # pylint: disable=too-many-branches
         # pylint: disable=too-many-statements
-        if isinstance(remote_path, str):
-            rmt_pth = pathlib.Path(remote_path)
-        elif isinstance(remote_path, pathlib.Path):
-            rmt_pth = remote_path
-        else:
-            raise NotImplementedError("Unhandled type of remote path: {}".format(type(remote_path)))
+        rmt_pth = remote_path if isinstance(remote_path, pathlib.Path) else pathlib.Path(remote_path)
 
-        if isinstance(local_path, str):
-            loc_pth_str = local_path
-        elif isinstance(local_path, pathlib.Path):
-            loc_pth_str = str(local_path)
-        else:
-            raise NotImplementedError("Unhandled type of local_path: {}".format(type(local_path)))
+        loc_pth_str = local_path if isinstance(local_path, str) else str(local_path)
 
         if create_directories:
             spurplus.sftp._mkdir(sftp=self._sftp, remote_path=rmt_pth.parent, mode=0o777, parents=True, exist_ok=True)
@@ -469,12 +456,7 @@ class SshShell:
         :param consistent: if set, writes to a temporary remote file first, and then renames it.
         :return:
         """
-        if isinstance(remote_path, str):
-            rmt_pth = pathlib.Path(remote_path)
-        elif isinstance(remote_path, pathlib.Path):
-            rmt_pth = remote_path
-        else:
-            raise NotImplementedError("Unhandled type of remote path: {}".format(type(remote_path)))
+        rmt_pth = remote_path if isinstance(remote_path, pathlib.Path) else pathlib.Path(remote_path)
 
         if create_directories:
             spurplus.sftp._mkdir(sftp=self._sftp, remote_path=rmt_pth.parent, mode=0o777, parents=True, exist_ok=True)
@@ -579,20 +561,9 @@ class SshShell:
         :param remote_path: path to the remote directory
         :return: difference between the directories
         """
-        # pylint: disable=too-many-branches
-        if isinstance(local_path, str):
-            local_pth = pathlib.Path(local_path)
-        elif isinstance(local_path, pathlib.Path):
-            local_pth = local_path
-        else:
-            raise ValueError("Unexpected type of local_path: {}".format(type(local_path)))
+        local_pth = local_path if isinstance(local_path, pathlib.Path) else pathlib.Path(local_path)
 
-        if isinstance(remote_path, str):
-            remote_pth = pathlib.Path(remote_path)
-        elif isinstance(remote_path, pathlib.Path):
-            remote_pth = remote_path
-        else:
-            raise ValueError("Unexpected type of remote_path: {}".format(type(remote_path)))
+        remote_pth = remote_path if isinstance(remote_path, pathlib.Path) else pathlib.Path(remote_path)
 
         local_map = _local_sync_map(local_path=local_pth)
         remote_map = self._remote_sync_map(remote_path=remote_pth)
@@ -602,12 +573,14 @@ class SshShell:
                 local_pth, remote_pth))
 
         if local_map is None:
+            assert remote_map is not None
             result = DirectoryDiff()
             result.remote_only_files = sorted(remote_map.file_set)
             result.remote_only_directories = sorted(remote_map.directory_set)
             return result
 
         if remote_map is None:
+            assert local_map is not None
             result = DirectoryDiff()
             result.local_only_files = sorted(local_map.file_set)
             result.local_only_directories = sorted(local_map.directory_set)
@@ -667,25 +640,15 @@ class SshShell:
         """
         # pylint: disable=too-many-arguments
         # pylint: disable=too-many-branches
-        if isinstance(local_path, str):
-            local_pth = pathlib.Path(local_path)
-        elif isinstance(local_path, pathlib.Path):
-            local_pth = local_path
-        else:
-            raise ValueError("Unexpected type of local_path: {}".format(type(local_path)))
+        local_pth = local_path if isinstance(local_path, pathlib.Path) else pathlib.Path(local_path)
+
+        remote_pth = remote_path if isinstance(remote_path, pathlib.Path) else pathlib.Path(remote_path)
 
         if not local_pth.exists():
             raise FileNotFoundError("Local path does not exist: {}".format(local_pth))
 
         if not local_pth.is_dir():
             raise NotADirectoryError("Local path is not a directory: {}".format(local_pth))
-
-        if isinstance(remote_path, str):
-            remote_pth = pathlib.Path(remote_path)
-        elif isinstance(remote_path, pathlib.Path):
-            remote_pth = remote_path
-        else:
-            raise ValueError("Unexpected type of remote_path: {}".format(type(remote_path)))
 
         dir_diff = self.directory_diff(local_path=local_pth, remote_path=remote_pth)
 
@@ -747,25 +710,15 @@ class SshShell:
         :param remote_path: path to the remote directory
         :return:
         """
-        if isinstance(local_path, str):
-            local_pth = pathlib.Path(local_path)
-        elif isinstance(local_path, pathlib.Path):
-            local_pth = local_path
-        else:
-            raise ValueError("Unexpected type of local_path: {}".format(type(local_path)))
+        local_pth = local_path if isinstance(local_path, pathlib.Path) else pathlib.Path(local_path)
+
+        remote_pth = remote_path if isinstance(remote_path, pathlib.Path) else pathlib.Path(remote_path)
 
         if not local_pth.exists():
             raise FileNotFoundError("Local path does not exist: {}".format(local_pth))
 
         if not local_pth.is_dir():
             raise NotADirectoryError("Local path is not a directory: {}".format(local_pth))
-
-        if isinstance(remote_path, str):
-            remote_pth = pathlib.Path(remote_path)
-        elif isinstance(remote_path, pathlib.Path):
-            remote_pth = remote_path
-        else:
-            raise ValueError("Unexpected type of remote_path: {}".format(type(remote_path)))
 
         if not self.is_dir(remote_path=remote_path):
             raise NotADirectoryError("Remote path is not a directory: {}".format(remote_pth))
@@ -790,20 +743,9 @@ class SshShell:
         :param consistent: if set, copies to a temporary local file first, and then renames it.
         :return:
         """
-        # pylint: disable=too-many-branches
-        if isinstance(remote_path, str):
-            rmt_pth_str = remote_path
-        elif isinstance(remote_path, pathlib.Path):
-            rmt_pth_str = remote_path.as_posix()
-        else:
-            raise NotImplementedError("Unhandled type of remote path: {}".format(type(remote_path)))
+        rmt_pth_str = remote_path if isinstance(remote_path, str) else remote_path.as_posix()
 
-        if isinstance(local_path, str):
-            loc_pth = pathlib.Path(local_path)
-        elif isinstance(local_path, pathlib.Path):
-            loc_pth = local_path
-        else:
-            raise NotImplementedError("Unhandled type of local path: {}".format(type(local_path)))
+        loc_pth = local_path if isinstance(local_path, pathlib.Path) else pathlib.Path(local_path)
 
         if create_directories:
             loc_pth.parent.mkdir(mode=0o777, exist_ok=True, parents=True)
@@ -836,12 +778,7 @@ class SshShell:
         :param remote_path: to the file
         :return: binary content of the file
         """
-        if isinstance(remote_path, str):
-            rmt_pth_str = remote_path
-        elif isinstance(remote_path, pathlib.Path):
-            rmt_pth_str = remote_path.as_posix()
-        else:
-            raise NotImplementedError("Unhandled type of remote path: {}".format(type(remote_path)))
+        rmt_pth_str = remote_path if isinstance(remote_path, str) else remote_path.as_posix()
 
         permerr = None  # type: Optional[PermissionError]
         notfounderr = None  # type: Optional[FileNotFoundError]

@@ -5,7 +5,6 @@ import hashlib
 import io
 import os
 import pathlib
-import tempfile
 import time
 import unittest
 import uuid
@@ -78,7 +77,8 @@ def set_up() -> spurplus.SshShell:
             retry_period=1)
     except ConnectionError as err:
         raise ConnectionError("Failed to connect to {}@{}:{}, private key file: {}, password is not None: {}".format(
-            params.username, params.hostname, params.port, params.private_key_file, params.password is not None))
+            params.username, params.hostname, params.port, params.private_key_file,
+            params.password is not None)) from err
 
     return shell
 
@@ -202,13 +202,13 @@ class TestBasicIO(unittest.TestCase):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
             pth = tmpdir.path / "some-dir" / "oi"
 
-            with tempfile.TemporaryDirectory() as local_tmpdir:
-                local_pth = pathlib.Path(local_tmpdir) / "local"
+            with temppathlib.TemporaryDirectory() as local_tmpdir:
+                local_pth = local_tmpdir.path / "local"
                 local_pth.write_text("hello")
 
                 self.shell.put(local_path=local_pth, remote_path=pth)
 
-                another_local_pth = pathlib.Path(local_tmpdir) / "some-other-dir" / "another_local"
+                another_local_pth = local_tmpdir.path / "some-other-dir" / "another_local"
                 self.shell.get(remote_path=pth, local_path=another_local_pth)
 
                 self.assertTrue(another_local_pth.exists())
@@ -216,8 +216,8 @@ class TestBasicIO(unittest.TestCase):
 
     def test_put_with_permission_error(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir:
-            with tempfile.TemporaryDirectory() as local_tmpdir:
-                local_pth = pathlib.Path(local_tmpdir) / 'file.txt'
+            with temppathlib.TemporaryDirectory() as local_tmpdir:
+                local_pth = local_tmpdir.path / 'file.txt'
                 local_pth.write_text("hello")
 
                 remote_pth = remote_tmpdir.path / 'file.txt'

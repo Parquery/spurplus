@@ -33,8 +33,8 @@ setup(
     packages=find_packages(exclude=['tests']),
     install_requires=['spur==0.3.20', 'typing_extensions>=3.6.2.1'],
     extras_require={
-        'dev': ['mypy==0.570', 'pylint==1.8.2', 'yapf==0.20.2', 'tox>=3.0.0', 'temppathlib>=1.0.3,<2',
-                'coverage>=4.5.1,<5'],
+        'dev':
+        ['mypy==0.620', 'pylint==1.8.2', 'yapf==0.20.2', 'tox>=3.0.0', 'temppathlib>=1.0.3,<2', 'coverage>=4.5.1,<5'],
         'test': ['tox>=3.0.0', 'temppathlib>=1.0.3,<2', 'coverage>=4.5.1,<5']
     },
     py_modules=['spurplus'],

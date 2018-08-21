@@ -11,6 +11,7 @@ import unittest
 import uuid
 from typing import Optional, List  # pylint: disable=unused-import
 
+import spur.ssh
 import spurplus
 
 
@@ -68,6 +69,7 @@ class TestSpurplus(unittest.TestCase):
             username=params.username,
             password=params.password,
             private_key_file=params.private_key_file,
+            missing_host_key=spur.ssh.MissingHostKey.accept,
             retries=2,
             retry_period=1)
 
@@ -79,23 +81,21 @@ class TestSpurplus(unittest.TestCase):
         self.assertEqual(out, 'hello world!\n')
 
     def test_stdout_redirection(self):
-        buf = io.StringIO()
-        self.shell.run(command=['echo', 'hello world!'], stdout=buf)
-        self.assertEqual(buf.getvalue(), "hello world!\n")
+        with io.StringIO() as buf:
+            self.shell.run(command=['echo', 'hello world!'], stdout=buf)
+            self.assertEqual(buf.getvalue(), "hello world!\n")
 
     def test_spawn(self):
-        buf = io.StringIO()
-        proc = self.shell.spawn(
-            command=['bash', '-c', 'for i in `seq 1 1000`; do echo hello world; sleep 0.0001; done'], stdout=buf)
-        result = proc.wait_for_result()
-        self.assertEqual(result.return_code, 0)
+        with io.StringIO() as buf:
+            proc = self.shell.spawn(
+                command=['bash', '-c', 'for i in `seq 1 1000`; do echo hello world; sleep 0.0001; done'], stdout=buf)
+            result = proc.wait_for_result()
+            self.assertEqual(result.return_code, 0)
 
-        expected = ''.join(["hello world\n"] * 1000)
-        self.assertEqual(buf.getvalue(), expected)
+            expected = ''.join(["hello world\n"] * 1000)
+            self.assertEqual(buf.getvalue(), expected)
 
     def test_tmpdir(self):
-        pth = None  # type: Optional[pathlib.Path]
-
         parent = pathlib.Path('/tmp') / str(uuid.uuid4())
         self.shell.mkdir(remote_path=parent)
 
@@ -113,7 +113,6 @@ class TestSpurplus(unittest.TestCase):
             self.assertFalse(self.shell.exists(remote_path=pth))
 
             # with default parameters
-            pth = None  # type: Optional[pathlib.Path]
             with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
                 pth = tmpdir.path
                 self.assertTrue(self.shell.exists(remote_path=pth))
@@ -147,7 +146,7 @@ class TestSpurplus(unittest.TestCase):
             # non-existing parent
             notfounderr = None  # type: Optional[FileNotFoundError]
             try:
-                with self.shell.open(remote_path=pathlib.Path("/some/non-existing/path"), mode='wb') as fid:
+                with self.shell.open(remote_path=pathlib.Path("/some/non-existing/path"), mode='wb'):
                     pass
             except FileNotFoundError as err:
                 notfounderr = err
@@ -159,7 +158,7 @@ class TestSpurplus(unittest.TestCase):
             # non-existing read
             notfounderr = None  # type: Optional[FileNotFoundError]
             try:
-                with self.shell.open(remote_path=pathlib.Path("/some/non-existing/path"), mode='rb') as fid:
+                with self.shell.open(remote_path=pathlib.Path("/some/non-existing/path"), mode='rb'):
                     pass
             except FileNotFoundError as err:
                 notfounderr = err
@@ -196,7 +195,7 @@ class TestSpurplus(unittest.TestCase):
             md5s = self.shell.md5s(remote_paths=remote_pths)
             self.assertListEqual(md5s, expected)
 
-    def test_benchmark_md5_versus_md5s(self):
+    def test__md5_versus_md5s(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
             remote_pths = []  # type: List[pathlib.Path]
             for i in range(0, 128):

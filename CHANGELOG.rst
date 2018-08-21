@@ -1,3 +1,7 @@
+1.2.0
+=====
+* Added ``sync_to_remote``
+
 1.1.2
 =====
 * Fixed identifier for py.typed in setup.py

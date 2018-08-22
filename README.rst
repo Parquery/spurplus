@@ -3,9 +3,15 @@ Spur+
 
 .. image:: https://api.travis-ci.com/Parquery/spurplus.svg?branch=master
     :target: https://api.travis-ci.com/Parquery/spurplus.svg?branch=master
+    :alt: Build Status
 
 .. image:: https://coveralls.io/repos/github/Parquery/spurplus/badge.svg?branch=master
     :target: https://coveralls.io/github/Parquery/spurplus?branch=master
+    :alt: Coverage
+
+.. image:: https://readthedocs.org/projects/spurplus/badge/?version=latest
+    :target: https://spurplus.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
 
 Spur+ builds on top of Spur_ library to help you manage the remote machines running a common Linux distribution via SSH.
 

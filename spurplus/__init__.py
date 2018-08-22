@@ -81,6 +81,15 @@ class DirectoryDiff:
     represents the difference between a local and a remote directory.
 
     All paths are given as relative.
+    **L** designates the local machine, **R** designates the remote machine.
+
+    :ivar local_only_files: files which exist on **L**, but are missing on **R**
+    :ivar identical_files: files which are the same on **L** and **R**
+    :ivar differing_files: files which differ between **L** and **R**
+    :ivar remote_only_files: files which exist on **R**, but are missing on **L**
+    :ivar local_only_directories: directories that exist only on **L**, but are missing on **R**
+    :ivar common_directories: directories that exist both on **L** and on **R**
+    :ivar remote_only_directories: directories that exist on **R**, but are missing on **L**
 
     """
 
@@ -89,7 +98,6 @@ class DirectoryDiff:
         self.identical_files = []  # type: List[pathlib.Path]
         self.differing_files = []  # type: List[pathlib.Path]
         self.remote_only_files = []  # type: List[pathlib.Path]
-
         self.local_only_directories = []  # type: List[pathlib.Path]
         self.common_directories = []  # type: List[pathlib.Path]
         self.remote_only_directories = []  # type: List[pathlib.Path]

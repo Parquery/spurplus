@@ -8,3 +8,4 @@ spurplus
 
 .. autoclass:: DirectoryDiff 
     :members:
+

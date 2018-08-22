@@ -101,6 +101,9 @@ Usage
         for attr in sftp.listdir_iter(path=p.as_posix()):
             do_something(attr.filename, attr.st_size)
 
+Documentation
+=============
+The documentation is available on `readthedocs <https://spurplus.readthedocs.io/en/latest/>`_.
 
 Installation
 ============

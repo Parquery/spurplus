@@ -1,3 +1,8 @@
+1.2.1
+=====
+* Improved the documentation
+* Added continuous integration
+
 1.2.0
 =====
 * Added ``sync_to_remote``

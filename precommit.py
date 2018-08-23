@@ -42,9 +42,14 @@ def main() -> int:
     print("Pylint'ing...")
     subprocess.check_call(["pylint", "--rcfile=pylint.rc", "tests", "spurplus"], cwd=repo_root.as_posix())
 
+    print("Pydocstyle'ing...")
+    subprocess.check_call(["pydocstyle", "spurplus"], cwd=repo_root.as_posix())
+
     print("Testing...")
     subprocess.check_call(
         ["coverage", "run", "--source", "spurplus", "-m", "unittest", "discover", "tests"], cwd=repo_root.as_posix())
+
+    subprocess.check_call(["coverage", "report"])
 
     return 0
 

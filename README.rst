@@ -160,15 +160,25 @@ Development
     - ``TEST_SSH_PASSWORD`` (optional, uses private key file if not specified) and
     - ``TEST_SSH_PRIVATE_KEY_FILE`` (optional, looks for private key in expected places if not specified).
 
-* We use tox for testing and packaging the distribution. Assuming that the above-mentioned environment variables has
-  been set, the virutal environment has been activated and the development dependencies have been installed, run:
+We use tox for testing and packaging the distribution. Assuming that the above-mentioned environment variables has
+been set, the virutal environment has been activated and the development dependencies have been installed, run:
 
 .. code-block:: bash
 
     tox
 
-* We also provide a set of pre-commit checks that lint and check code for formatting. Run them locally from an activated
-  virtual environment with development dependencies:
+Pre-commit Checks
+-----------------
+We provide a set of pre-commit checks that lint and check code for formatting.
+
+Namely, we use:
+
+* `yapf <https://github.com/google/yapf>`_ to check the formatting.
+* The style of the docstrings is checked with `pydocstyle <https://github.com/PyCQA/pydocstyle>`_.
+* Static type analysis is performed with `mypy <http://mypy-lang.org/>`_.
+* Various linter checks are done with `pylint <https://www.pylint.org/>`_.
+
+Run the pre-commit checks locally from an activated virtual environment with development dependencies:
 
 .. code-block:: bash
 
@@ -179,6 +189,7 @@ Development
 .. code-block:: bash
 
     ./precommit.py  --overwrite
+
 
 Versioning
 ==========

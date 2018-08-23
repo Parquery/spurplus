@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""
-Helps you manage remote machines via SSH.
-"""
+"""Manage remote machines and perform file operations over SSH."""
+
 import contextlib
 import enum
 import hashlib
@@ -26,27 +25,31 @@ import spurplus.sftp
 
 
 class Delete(enum.Enum):
-    """enumerates delete strategies when syncing."""
+    """Enumerate delete strategies when syncing."""
+
     BEFORE = 1
     AFTER = 2
 
 
-class SyncMap:
+class _SyncMap:
     """
-    represents the MD5s of the files and the set of directories needed to sync remote and local directories.
+    Represent the listing of file and the directories needed for syncing remote and local directories.
 
     All paths are given as relative paths.
 
+    :ivar file_set: set of all files available in a directory including the files in subdirectories
+    :ivar directory_set: set of all sub-directories in a directory (including the subdirectories with depth > 1)
     """
 
     def __init__(self) -> None:
+        """Initialize file and directory set with empty sets."""
         self.file_set = set()  # type: Set[pathlib.Path]
         self.directory_set = set()  # type: Set[pathlib.Path]
 
 
-def _local_sync_map(local_path: pathlib.Path) -> Optional[SyncMap]:
+def _local_sync_map(local_path: pathlib.Path) -> Optional[_SyncMap]:
     """
-    lists all the files and directories beneath the ``local_path``.
+    List all the files and directories beneath the ``local_path``.
 
     All paths are given as relative paths to the ``local_path``.
 
@@ -69,7 +72,7 @@ def _local_sync_map(local_path: pathlib.Path) -> Optional[SyncMap]:
         else:
             directory_set.add(rel_pth)
 
-    sync_map = SyncMap()
+    sync_map = _SyncMap()
     sync_map.file_set = file_set
     sync_map.directory_set = directory_set
 
@@ -78,7 +81,7 @@ def _local_sync_map(local_path: pathlib.Path) -> Optional[SyncMap]:
 
 class DirectoryDiff:
     """
-    represents the difference between a local and a remote directory.
+    Represent the difference between a local and a remote directory.
 
     All paths are given as relative.
     **L** designates the local machine, **R** designates the remote machine.
@@ -94,6 +97,7 @@ class DirectoryDiff:
     """
 
     def __init__(self) -> None:
+        """Initialize all the properties with empty lists."""
         self.local_only_files = []  # type: List[pathlib.Path]
         self.identical_files = []  # type: List[pathlib.Path]
         self.differing_files = []  # type: List[pathlib.Path]
@@ -105,10 +109,10 @@ class DirectoryDiff:
 
 class SshShell:
     """
-    wraps a spur.SshShell instance.
+    Wrap a spur.SshShell instance.
 
-    Adds typing and support for pathlib.Path and facilitates common tasks such as md5 sum computation,
-    directory creation and providing one-liners for reading/writing files.
+    This wrapper adds typing and support for pathlib.Path and facilitates common tasks such as md5 sum computation and
+    file operations.
 
     """
 
@@ -120,7 +124,7 @@ class SshShell:
                  close_spur_shell: bool = True,
                  close_sftp: bool = True) -> None:
         """
-        Initializes the SSH wrapper with the given underlying spur SshShell and the SFTP client.
+        Initialize the SSH wrapper with the given underlying spur SshShell and the SFTP client.
 
         :param spur_ssh_shell: to wrap
         :param sftp: to wrap
@@ -135,20 +139,21 @@ class SshShell:
 
     def as_spur(self) -> spur.ssh.SshShell:
         """
-        :return:
-            the contained spur.SshShell instance;
-            for example, use the contained SshShell instance if you need undocumented spur functionality.
+        Get the underlying spur shell instance.
 
+        Use that instance if you need undocumented spur functionality.
+
+        :return: underlying spur shell
         """
         return self._spur
 
     def as_sftp(self) -> Union[paramiko.SFTP, spurplus.sftp.ReconnectingSFTP]:
         """
-        :return:
-            the contained SFTP client;
-            for example, use this client when you need more fine-grained operations such as retrieving
-            stats of a file.
+        Get the underlying SFTP client.
 
+        Use that client if you need fine-grained SFTP functionality not available in this class.
+
+        :return: underlying SFTP client
         """
         return self._sftp
 
@@ -162,7 +167,7 @@ class SshShell:
             encoding: str = 'utf-8',
             use_pty: bool = False) -> spur.results.ExecutionResult:
         """
-        runs a command on the remote instance and waits for it to complete.
+        Run a command on the remote instance and waits for it to complete.
 
         From https://github.com/mwilliamson/spur.py/blob/0.3.20/README.rst:
 
@@ -220,7 +225,7 @@ class SshShell:
                      encoding: str = 'utf-8',
                      use_pty: bool = False) -> str:
         """
-        runs a command on the remote instance that is not allowed to fail and captures its output.
+        Run a command on the remote instance that is not allowed to fail and captures its output.
 
         See run() for further documentation.
 
@@ -241,7 +246,7 @@ class SshShell:
               use_pty: bool = False,
               allow_error: bool = False) -> spur.ssh.SshProcess:
         """
-        spawns a remote process.
+        Spawn a remote process.
 
         From https://github.com/mwilliamson/spur.py/blob/0.3.20/README.rst:
 
@@ -296,7 +301,7 @@ class SshShell:
 
     def open(self, remote_path: Union[str, pathlib.Path], mode: str = "r") -> Union[TextIO, BinaryIO]:
         """
-        opens a file for reading or writing.
+        Open a file for reading or writing.
 
         By default, files are opened in text mode. Appending "b" to the mode will open the file in binary mode.
 
@@ -330,7 +335,7 @@ class SshShell:
 
     def md5(self, remote_path: Union[str, pathlib.Path]) -> str:
         """
-        computes MD5 checksum of the remote file. It is assumed that md5sum command is available on the remote machine.
+        Compute MD5 checksum of the remote file. It is assumed that md5sum command is available on the remote machine.
 
         :param remote_path: to the file
         :return: MD5 sum
@@ -342,8 +347,9 @@ class SshShell:
 
     def md5s(self, remote_paths: Sequence[Union[str, pathlib.Path]]) -> List[Optional[str]]:
         """
-        computes MD5 checksums of multiple remote files individually. It is assumed that md5sum command is available
-        on the remote machine.
+        Compute MD5 checksums of multiple remote files individually.
+
+        It is assumed that md5sum command is available on the remote machine.
 
         :param remote_paths: to the files
         :return: MD5 sum for each remote file separately; if a file does not exist, its checksum is set to None.
@@ -373,7 +379,7 @@ class SshShell:
             create_directories: bool = True,
             consistent: bool = True) -> None:
         """
-        puts a file on the remote host.
+        Put a file on the remote host.
 
         Mind that if you set consistent to True, the file will be copied to a temporary file and then
         POSIX rename function will be used to rename it. The ownership and the permissions of the original 'remote_path'
@@ -474,7 +480,7 @@ class SshShell:
                     create_directories: bool = True,
                     consistent: bool = True) -> None:
         """
-        writes the binary data to a remote file.
+        Write the binary data to a remote file.
 
         :param remote_path: to the file
         :param data: to be written
@@ -519,7 +525,7 @@ class SshShell:
                    create_directories: bool = True,
                    consistent: bool = True) -> None:
         """
-        writes the binary content to the remote host.
+        Write the binary content to the remote host.
 
         :param remote_path: to the file
         :param text: to be written
@@ -533,9 +539,9 @@ class SshShell:
         self.write_bytes(
             remote_path=remote_path, data=data, create_directories=create_directories, consistent=consistent)
 
-    def _remote_sync_map(self, remote_path: pathlib.Path) -> Optional[SyncMap]:
+    def _remote_sync_map(self, remote_path: pathlib.Path) -> Optional[_SyncMap]:
         """
-        lists all the files and directories beneath the ``remote_path``.
+        List all the files and directories beneath the ``remote_path``.
 
         :param remote_path: path to the remote directory
         :return: collected sync map, or None if the ``remote_path`` does not exist
@@ -568,7 +574,7 @@ class SshShell:
                 else:
                     file_set.add(rel_pth)
 
-        sync_map = SyncMap()
+        sync_map = _SyncMap()
         sync_map.file_set = file_set
         sync_map.directory_set = directory_set
 
@@ -577,7 +583,7 @@ class SshShell:
     def directory_diff(self, local_path: Union[str, pathlib.Path],
                        remote_path: Union[str, pathlib.Path]) -> DirectoryDiff:
         """
-        iterates through the local and the remote directory and computes the diff.
+        Iterate through the local and the remote directory and computes the diff.
 
         If one of the directories does not exist, all files are assumed "missing" in that directory.
 
@@ -646,7 +652,7 @@ class SshShell:
                        delete: Optional[Delete] = None,
                        preserve_permissions: bool = False) -> None:
         """
-        syncs all the files beneath the ``local_path`` to ``remote_path``.
+        Sync all the files beneath the ``local_path`` to ``remote_path``.
 
         Both local path and remote path are directories. If the ``remote_path`` does not exist, it is created. The
         files are compared with MD5 first and only the files whose MD5s mismatch are copied.
@@ -726,7 +732,7 @@ class SshShell:
     def mirror_local_permissions(self, relative_paths: Sequence[Union[str, pathlib.Path]],
                                  local_path: Union[str, pathlib.Path], remote_path: Union[str, pathlib.Path]) -> None:
         """
-        sets the permissions of the remote files to be the same as the permissions of the local files.
+        Set the permissions of the remote files to be the same as the permissions of the local files.
 
         The files are given as relative paths and are expected to exist both beneath ``local_path`` and
         beneath ``remote_path``.
@@ -761,7 +767,7 @@ class SshShell:
             create_directories: bool = True,
             consistent: bool = True) -> None:
         """
-        gets a file from the remote host.
+        Get a file from the remote host.
 
         :param remote_path: to the file
         :param local_path: to the file
@@ -799,7 +805,7 @@ class SshShell:
 
     def read_bytes(self, remote_path: Union[str, pathlib.Path]) -> bytes:
         """
-        reads the binary data from a remote file.
+        Read the binary data from a remote file.
 
         :param remote_path: to the file
         :return: binary content of the file
@@ -826,7 +832,7 @@ class SshShell:
 
     def read_text(self, remote_path: Union[str, pathlib.Path], encoding: str = 'utf-8') -> str:
         """
-        reads the text content of a remote file.
+        Read the text content of a remote file.
 
         :param remote_path: to the file
         :param encoding: of the text file
@@ -837,6 +843,8 @@ class SshShell:
 
     def exists(self, remote_path: Union[str, pathlib.Path]) -> bool:
         """
+        Check whether a file exists.
+
         :param remote_path: to the file
         :return: True if the file exists on the remote machine at `remote_path`
         """
@@ -848,7 +856,7 @@ class SshShell:
               parents: bool = False,
               exist_ok: bool = False) -> None:
         """
-        creates the remote directory.
+        Create the remote directory.
 
         :param remote_path: to the directory
         :param mode: directory permission mode
@@ -860,7 +868,7 @@ class SshShell:
 
     def remove(self, remote_path: Union[str, pathlib.Path], recursive: bool = False) -> None:
         """
-        removes a file.
+        Remove a file or a directory.
 
         :param remote_path: to a file or a directory
         :param recursive:
@@ -920,7 +928,7 @@ class SshShell:
 
     def chmod(self, remote_path: Union[str, pathlib.Path], mode: int) -> None:
         """
-        changes the permission mode of the file.
+        Change the permission mode of the file.
 
         :param remote_path: to the file
         :param mode: permission mode
@@ -933,7 +941,7 @@ class SshShell:
 
     def stat(self, remote_path: Union[str, pathlib.Path]) -> Optional[paramiko.SFTPAttributes]:
         """
-        stats the given remote path.
+        Stat the given remote path.
 
         :param remote_path: to the file
         :return: stats of the file; None if the file does not exist
@@ -948,7 +956,7 @@ class SshShell:
 
     def is_dir(self, remote_path: Union[str, pathlib.Path]) -> bool:
         """
-        checks whether the remote path is a directory.
+        Check whether the remote path is a directory.
 
         :param remote_path: path to the remote file or directory
         :return: True if the remote path is a directory
@@ -962,7 +970,7 @@ class SshShell:
 
     def is_symlink(self, remote_path: Union[str, pathlib.Path]) -> bool:
         """
-        checks whether the remote path is a symlink.
+        Check whether the remote path is a symlink.
 
         :param remote_path: path to the remote file or directory
         :return: True if the remote path is a directory
@@ -977,7 +985,7 @@ class SshShell:
 
     def symlink(self, source: Union[str, pathlib.Path], destination: Union[str, pathlib.Path]) -> None:
         """
-        creates a symbolic link to the ``source`` remote path at ``destination``.
+        Create a symbolic link to the ``source`` remote path at ``destination``.
 
         :param source: remote path to the source
         :param destination: remote path where to store the symbolic link
@@ -996,7 +1004,7 @@ class SshShell:
 
     def chown(self, remote_path: Union[str, pathlib.Path], uid: int, gid: int) -> None:
         """
-        changes the ownership of the file.
+        Change the ownership of the file.
 
         If you only want to change the uid or gid, please stat() the file before, and re-apply the current uid or gid,
         respectively.
@@ -1009,7 +1017,7 @@ class SshShell:
         self._sftp.chown(path=str(remote_path), uid=uid, gid=gid)
 
     def close(self) -> None:
-        """ closes the shell. """
+        """Close the underlying spur shell and SFTP (if ``close_spur_shell`` and ``close_sftp``, respectively)."""
         if self.close_spur_shell:
             self._spur.__exit__()
 
@@ -1017,14 +1025,16 @@ class SshShell:
             self._sftp.close()
 
     def __enter__(self) -> 'SshShell':
+        """Enter the context and give the shell prepared in the constructor."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Close the underlying connection upon leaving the context."""
         self.close()
 
 
 class TemporaryDirectory:
-    """ represents a remote temporary directory. """
+    """Represent a remote temporary directory."""
 
     def __init__(self,
                  shell: SshShell,
@@ -1032,14 +1042,13 @@ class TemporaryDirectory:
                  suffix: Optional[str] = None,
                  tmpdir: Optional[Union[str, pathlib.Path]] = None) -> None:
         """
-        creates a temporary directory.
+        Create a temporary directory.
 
         :param shell: to the remote instance
         :param prefix: if specified, prefix of the directory file name
         :param suffix: if specified, suffix of the directory file name
         :param tmpdir: if specified, base directory in which the temporary directory will be created
         """
-
         if prefix is not None and '/' in prefix:
             raise ValueError("Unexpected slash ('/') in prefix: {}".format(prefix))
 
@@ -1071,9 +1080,11 @@ class TemporaryDirectory:
         self.path = pathlib.Path(shell.check_output(command=cmd).strip())
 
     def __enter__(self) -> 'TemporaryDirectory':
+        """Enter the context already prepared in the constructor."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Remove the temporary directory."""
         self.shell.run(command=['rm', '-rf', self.path.as_posix()])
 
 
@@ -1091,14 +1102,14 @@ def connect_with_retries(hostname: str,
                          retries: int = 12,
                          retry_period: int = 5) -> SshShell:
     """
-    tries to connect to the instance `retries` number of times and wait for `retry_period` seconds between
-    the retries.
+    Try to connect to the instance and retry on failure.
+
+    Reconnect `retries` number of times and wait for `retry_period` seconds between the retries.
 
     For all the arguments except `retries` and `retry_period`, the documentation was copy/pasted from
     https://github.com/mwilliamson/spur.py/blob/0.3.20/README.rst:
 
-    Requires a hostname. Also requires some combination of a username, password and private key,
-    as necessary to authenticate.
+    You need to specify some combination of a username, password and private key to authenticate.
 
     :param hostname: of the instance to connect
     :param username: for authentication
@@ -1206,8 +1217,9 @@ def connect_with_retries(hostname: str,
 
 def chunk_arguments(args: List[str], arg_max: int = 16 * 1024, argc_max=1024) -> List[List[str]]:
     """
-    splits a long list of command-line arguments into chunks in order not to overflow the maximum length of the
-    command-line arguments.
+    Split a long list of command-line arguments into chunks.
+
+    This is needed in order not to overflow the maximum length of the command-line arguments.
 
     :param args: command-line arguments
     :param arg_max: maximum length of the command-line arguments (i.e. the result of ``getconf ARG_MAX``)

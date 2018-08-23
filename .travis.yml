@@ -21,8 +21,5 @@ env:
 script:
   - cat $HOME/.ssh/authorized_keys
   - ssh -v -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $HOME/test_id_rsa $USER@127.0.0.1 -- echo hi
-  - coverage run --source spurplus -m unittest discover tests
+  - python3 precommit.py
   - coveralls
-  - mypy spurplus tests
-  - yapf --style style.yapf --recursive --diff tests spurplus
-  - pylint --rcfile=pylint.rc tests spurplus

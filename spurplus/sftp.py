@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-""" provides wrappers around paramiko.SFTP. """
+"""Wrap paramiko.SFTP."""
 import os
 import pathlib
 import socket
@@ -12,13 +12,15 @@ T = TypeVar('T')
 
 
 class ReconnectingSFTP:
-    """ automatically opens a new paramiko.SFTP on connection failure. """
+    """Open automatically a new paramiko.SFTP on connection failure."""
 
     # pylint: disable=too-many-public-methods
 
     def __init__(self, sftp_opener: Callable[[], paramiko.SFTP], max_retries: int = 10,
                  retry_period: float = 0.1) -> None:
         """
+        Iniialize.
+
         :param sftp_opener: method to open a new SFTP connection
         :param max_retries: maximum number of retries before raising ConnectionError
         :param retry_period: how long to wait between two retries; in seconds
@@ -33,22 +35,24 @@ class ReconnectingSFTP:
         self.last_working_directory = None  # type: Optional[str]
 
     def close(self) -> None:
-        """ closes the reconnecting SFTP client (and consequently, the underlying paramiko SFTP client). """
+        """Close the the underlying paramiko SFTP client."""
         if self.__sftp is not None:
             self.__sftp.close()
             self.__sftp = None
 
     def __enter__(self) -> 'ReconnectingSFTP':
+        """Return self prepared in a constructor upon enter."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close upon exist."""
         self.close()
 
     def __wrap(self, method: Callable[[paramiko.SFTP], T]) -> T:
         """
-        wraps the SFTP method in a retry loop.
+        Wrap the SFTP method in a retry loop.
 
-        Opens an SFTP connection, if necessary, and changes to the last recorded working directory before
+        Open an SFTP connection, if necessary, and change to the last recorded working directory before
         executing the method.
 
         :param method: to be wrapped
@@ -85,121 +89,83 @@ class ReconnectingSFTP:
         return method(self.__sftp)
 
     def listdir(self, path='.'):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.listdir(path))
 
     def listdir_attr(self, path='.'):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.listdir_attr(path))
 
     def listdir_iter(self, path='.', read_aheads=50):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.listdir_iter(path, read_aheads))
 
     def open(self, filename, mode='r', bufsize=-1):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.open(filename, mode, bufsize))
 
     file = open
 
     def remove(self, path):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.remove(path))
 
     unlink = remove
 
     def rename(self, oldpath, newpath):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.rename(oldpath, newpath))
 
     def posix_rename(self, oldpath, newpath):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.posix_rename(oldpath, newpath))
 
     def mkdir(self, path, mode=0o777):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.mkdir(path, mode))
 
     def rmdir(self, path):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.rmdir(path))
 
     def stat(self, path):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.stat(path))
 
     def lstat(self, path):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.lstat(path))
 
     def symlink(self, source, dest):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.symlink(source, dest))
 
     def chmod(self, path, mode):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.chmod(path, mode))
 
     def chown(self, path, uid, gid):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.chown(path, uid, gid))
 
     def utime(self, path, times):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.utime(path, times))
 
     def truncate(self, path, size):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.truncate(path, size))
 
     def readlink(self, path):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.readlink(path))
 
     def normalize(self, path):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.normalize(path))
 
     def chdir(self, path=None):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         result = self.__wrap(method=lambda sftp: sftp.chdir(path))
 
         self.last_working_directory = path
@@ -207,43 +173,35 @@ class ReconnectingSFTP:
         return result
 
     def getcwd(self):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.getcwd())
 
     def putfo(self, fl, remotepath, file_size=0, callback=None, confirm=True):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         # pylint: disable=invalid-name
         # pylint: disable=too-many-arguments
 
         return self.__wrap(method=lambda sftp: sftp.putfo(fl, remotepath, file_size, callback, confirm))
 
     def put(self, localpath, remotepath, callback=None, confirm=True):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.put(localpath, remotepath, callback, confirm))
 
     def getfo(self, remotepath, fl, callback=None):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         # pylint: disable=invalid-name
         # pylint: disable=too-many-arguments
         return self.__wrap(method=lambda sftp: sftp.getfo(remotepath, fl, callback))
 
     def get(self, remotepath, localpath, callback=None):
-        """
-        See paramiko.SFTP documentation.
-        """
+        """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.get(remotepath, localpath, callback))
 
 
 def _exists(sftp: Union[paramiko.SFTP, ReconnectingSFTP], remote_path: Union[str, pathlib.Path]) -> bool:
     """
+    Check if a file exists on a remote machine.
+
     :param sftp: SFTP client
     :param remote_path: to the file
     :return: True if the file exists on the remote machine at `remote_path`
@@ -277,7 +235,7 @@ def _mkdir(sftp: Union[paramiko.SFTP, ReconnectingSFTP],
            parents: bool = False,
            exist_ok: bool = False) -> None:
     """
-    creates the remote directory with the given SFTP client.
+    Create the remote directory with the given SFTP client.
 
     :param sftp: SFTP client
     :param remote_path: to the directory

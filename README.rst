@@ -13,9 +13,10 @@ Spur+
     :target: https://spurplus.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
-Spur+ builds on top of Spur_ library to help you manage the remote machines running a common Linux distribution via SSH.
+Spur+ is a library to manage remote machines and perform file operations over SSH.
 
-While we already find that Spur_ provides most of the functionality out-of-the-box, we missed certain features:
+It builds on top of Spur_ and Paramiko_ libraries. While we already find that Spur_ and Paramiko_ provide most of the
+functionality out-of-the-box, we missed certain features:
 
 - typing. Since spur supports both Python 2 and 3, it does not provide any type annotations which makes it harder to use
   with type checkers such as mypy.
@@ -54,6 +55,7 @@ While we already find that Spur_ provides most of the functionality out-of-the-b
   This can lead up to 25x speed-up (see the benchmark in ``tests/live_test.py``).
 
 .. _Spur: https://github.com/mwilliamson/spur.py
+.. _Paramiko: https://github.com/paramiko/paramiko
 
 Usage
 =====

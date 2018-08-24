@@ -12,7 +12,7 @@ from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))  # pylint: disable=invalid-name
 
-with open(os.path.join(here, 'version.txt'), encoding='utf-8') as fid:
+with open(os.path.abspath('version.txt'), encoding='utf-8') as fid:
     version = fid.read().strip()  # pylint: disable=invalid-name
 
 with open(os.path.join(here, 'README.rst'), encoding='utf-8') as fid:
@@ -43,4 +43,6 @@ setup(
         'test': ['tox>=3.0.0', 'temppathlib>=1.0.3,<2', 'coverage>=4.5.1,<5']
     },
     py_modules=['spurplus'],
-    package_data={"spurplus": ["py.typed"]})
+    include_package_data=True,
+    package_data={"spurplus": ["py.typed"],
+                  '': ['version.txt', 'LICENSE.txt']})

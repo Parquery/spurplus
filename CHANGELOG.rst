@@ -1,3 +1,7 @@
+1.2.3
+=====
+* Added version and license to the package
+
 1.2.2
 =====
 * Fixed a bug related to local MD5 given as objects instead of hexdigests

@@ -336,6 +336,9 @@ class TestFileOps(unittest.TestCase):
 
             self.assertEqual(str(existserr), "The remote directory already exists: {}".format(pth))
 
+            # existing directory does not raise an error on exist_ok=True
+            self.shell.mkdir(remote_path=pth, mode=0o700, exist_ok=True)
+
     def test_mkdir_with_permission_error(self):  # pylint: disable=invalid-name
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
             try:

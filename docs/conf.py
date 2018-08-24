@@ -23,10 +23,12 @@ project = 'spurplus'
 copyright = '2018, Parquery AG'
 author = 'Marko Ristin'
 
+
 # The short X.Y version
 version = ''
 # The full version, including alpha/beta/rc tags
-release = '1.2.1'
+with open(os.path.abspath('../version.txt'), 'rt') as fid:
+    release = fid.read().strip()
 
 
 # -- General configuration ---------------------------------------------------

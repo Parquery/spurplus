@@ -1,3 +1,7 @@
+1.2.2
+=====
+* Fixed a bug related to local MD5 given as objects instead of hexdigests
+
 1.2.1
 =====
 * Improved the documentation

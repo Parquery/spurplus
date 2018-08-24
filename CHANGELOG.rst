@@ -1,3 +1,7 @@
+1.2.4
+=====
+* Fixed ``mkdir`` failing on an existing directory with ``exit_ok=True``
+
 1.2.3
 =====
 * Added version and license to the package

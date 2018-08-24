@@ -12,12 +12,15 @@ from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))  # pylint: disable=invalid-name
 
-with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
-    long_description = f.read()  # pylint: disable=invalid-name
+with open(os.path.join(here, 'version.txt'), encoding='utf-8') as fid:
+    version = fid.read().strip()  # pylint: disable=invalid-name
+
+with open(os.path.join(here, 'README.rst'), encoding='utf-8') as fid:
+    long_description = fid.read().strip()  # pylint: disable=invalid-name
 
 setup(
     name='spurplus',
-    version='1.2.1',
+    version=version,
     description='Manage remote machines and file operations over SSH.',
     long_description=long_description,
     url='http://github.com/Parquery/spurplus',

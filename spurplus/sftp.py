@@ -252,8 +252,11 @@ def _mkdir(sftp: Union[paramiko.SFTP, ReconnectingSFTP],
     else:
         raise NotImplementedError("Unhandled type of remote path: {}".format(type(remote_path)))
 
-    if not exist_ok and _exists(sftp=sftp, remote_path=remote_path):
-        raise FileExistsError("The remote directory already exists: {}".format(remote_path))
+    if _exists(sftp=sftp, remote_path=remote_path):
+        if not exist_ok:
+            raise FileExistsError("The remote directory already exists: {}".format(remote_path))
+        else:
+            return
 
     oserr = None  # type: Optional[OSError]
 

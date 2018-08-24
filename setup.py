@@ -44,5 +44,7 @@ setup(
     },
     py_modules=['spurplus'],
     include_package_data=True,
-    package_data={"spurplus": ["py.typed"],
-                  '': ['version.txt', 'LICENSE.txt']})
+    package_data={
+        "spurplus": ["py.typed"],
+        '': ['version.txt', 'LICENSE.txt']
+    })

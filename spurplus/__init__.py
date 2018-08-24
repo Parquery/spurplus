@@ -633,7 +633,7 @@ class SshShell:
 
         local_md5s = []
         for rel_pth in common_files:
-            local_md5s.append(hashlib.md5((local_pth / rel_pth).read_bytes()))
+            local_md5s.append(hashlib.md5((local_pth / rel_pth).read_bytes()).hexdigest())
 
         remote_md5s = self.md5s(remote_paths=[remote_pth / rel_pth for rel_pth in common_files])
 

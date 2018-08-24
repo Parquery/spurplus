@@ -606,6 +606,60 @@ class TestMirrorPermissions(unittest.TestCase):
                 remote_tmpdir.path / "some-dir/some-file"), str(not_found_err))
 
 
+class TestSpurplusDirectoryDiff(unittest.TestCase):
+    def setUp(self):
+        self.shell = set_up()
+
+    def tearDown(self):
+        self.shell.close()
+
+    def test_that_it_works(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
+                temppathlib.TemporaryDirectory() as local_tmpdir:
+            # Set up local
+            local_only_dir = local_tmpdir.path / "local-only-dir"
+            local_only_dir.mkdir()
+
+            local_only_file = local_only_dir / "local-only-file"
+            local_only_file.write_text("hello")
+
+            local_common_dir = local_tmpdir.path / "common"
+            local_common_dir.mkdir()
+
+            local_identical_file = local_common_dir / "identical-file"
+            local_identical_file.write_text("hello")
+
+            local_different_file = local_common_dir / "different-file"
+            local_different_file.write_text("hi")
+
+            # Set up remote
+            remote_only_dir = remote_tmpdir.path / "remote-only-dir"
+            self.shell.mkdir(remote_path=remote_only_dir)
+
+            remote_only_pth = remote_only_dir / "remote-only-file"
+            self.shell.write_text(remote_path=remote_only_pth, text="hello")
+
+            remote_common_dir = remote_tmpdir.path / "common"
+            self.shell.mkdir(remote_path=remote_common_dir)
+
+            remote_identical_file = remote_common_dir / "identical-file"
+            self.shell.write_text(remote_path=remote_identical_file, text="hello")
+
+            remote_different_file = remote_common_dir / "different-file"
+            self.shell.write_text(remote_path=remote_different_file, text="zdravo")
+
+            # Diff
+            dir_diff = self.shell.directory_diff(local_path=local_tmpdir.path, remote_path=remote_tmpdir.path)
+
+            self.assertListEqual([pathlib.Path('local-only-dir/local-only-file')], dir_diff.local_only_files)
+            self.assertListEqual([pathlib.Path('local-only-dir')], dir_diff.local_only_directories)
+            self.assertListEqual([pathlib.Path('common/identical-file')], dir_diff.identical_files)
+            self.assertListEqual([pathlib.Path('common/different-file')], dir_diff.differing_files)
+            self.assertListEqual([pathlib.Path('common')], dir_diff.common_directories)
+            self.assertListEqual([pathlib.Path('remote-only-dir/remote-only-file')], dir_diff.remote_only_files)
+            self.assertListEqual([pathlib.Path('remote-only-dir')], dir_diff.remote_only_directories)
+
+
 class TestSpurplusSyncToRemote(unittest.TestCase):
     def setUp(self):
         self.shell = set_up()

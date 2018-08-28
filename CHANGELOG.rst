@@ -1,3 +1,8 @@
+1.2.5
+=====
+* Fixed problems with version.txt files
+* tox runs with Python 3.5 and 3.6
+
 1.2.4
 =====
 * Fixed ``mkdir`` failing on an existing directory with ``exit_ok=True``

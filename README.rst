@@ -17,6 +17,9 @@ Spur+
     :target: https://pypi.org/project/spurplus/
     :alt: PyPi
 
+.. image:: https://img.shields.io/pypi/pyversions/spurplus.svg
+    :alt: PyPI - Python Version
+
 Spur+ is a library to manage remote machines and perform file operations over SSH.
 
 It builds on top of Spur_ and Paramiko_ libraries. While we already find that Spur_ and Paramiko_ provide most of the

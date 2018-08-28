@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Runs precommit checks on the repository."""
 import argparse
+import os
 import pathlib
 import subprocess
 import sys

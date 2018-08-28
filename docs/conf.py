@@ -25,10 +25,9 @@ author = 'Marko Ristin'
 
 
 # The short X.Y version
-version = ''
+version = '1.2'
 # The full version, including alpha/beta/rc tags
-with open(os.path.abspath('../version.txt'), 'rt') as fid:
-    release = fid.read().strip()
+release = '1.2.5'
 
 
 # -- General configuration ---------------------------------------------------

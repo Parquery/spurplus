@@ -12,6 +12,10 @@ Spur+
 .. image:: https://readthedocs.org/projects/spurplus/badge/?version=latest
     :target: https://spurplus.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
+    
+.. image:: https://badge.fury.io/py/spurplus.svg
+    :target: https://pypi.org/project/spurplus/
+    :alt: PyPi
 
 Spur+ is a library to manage remote machines and perform file operations over SSH.
 

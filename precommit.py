@@ -47,6 +47,9 @@ def main() -> int:
     subprocess.check_call(["pydocstyle", "spurplus"], cwd=repo_root.as_posix())
 
     print("Testing...")
+    env = os.environ.copy()
+    env['ICONTRACT_SLOW'] = 'true'
+
     subprocess.check_call(
         ["coverage", "run", "--source", "spurplus", "-m", "unittest", "discover", "tests"], cwd=repo_root.as_posix())
 

@@ -15,6 +15,8 @@ import temppathlib
 
 import spurplus
 
+# pylint: disable=too-many-lines
+
 
 class Params:
     """ represents parameters used to connect to the server. """
@@ -56,9 +58,8 @@ class TestReconnection(unittest.TestCase):
             connerr = err
 
         self.assertEqual(
-            str(connerr),
             "Failed to connect after 2 retries to some-nonexisting-hostname.com: Error creating SSH connection\n"
-            "Original error: [Errno -2] Name or service not known")
+            "Original error: [Errno -2] Name or service not known", str(connerr))
 
 
 def set_up() -> spurplus.SshShell:
@@ -83,7 +84,7 @@ def set_up() -> spurplus.SshShell:
     return shell
 
 
-class TestDirs(unittest.TestCase):
+class TestTemporaryDirs(unittest.TestCase):
     def setUp(self):
         self.shell = set_up()
 
@@ -117,6 +118,25 @@ class TestDirs(unittest.TestCase):
         finally:
             self.shell.run(command=['rm', '-rf', parent.as_posix()])
 
+    def test_invalid_base_directory(self):
+        parent = pathlib.Path('/tmp') / str(uuid.uuid4())
+        self.shell.mkdir(remote_path=parent)
+        some_nonexisting_dir = parent / "some-nonexisting-dir"
+        notfounderr = None  # type: Optional[FileNotFoundError]
+
+        try:
+            with spurplus.TemporaryDirectory(
+                    shell=self.shell, prefix='pre pre', suffix='suf suf', tmpdir=some_nonexisting_dir):
+                pass
+        except FileNotFoundError as err:
+            notfounderr = err
+        finally:
+            self.shell.run(command=['rm', '-rf', parent.as_posix()])
+
+        self.assertEqual(
+            "Remote parent directory of the temporary directory does not exist: {}".format(some_nonexisting_dir),
+            str(notfounderr))
+
 
 class TestRun(unittest.TestCase):
     def setUp(self):
@@ -128,24 +148,115 @@ class TestRun(unittest.TestCase):
     def test_run(self):
         self.shell.run(command=['echo', 'hello world!'])
 
+    def test_valid_encoding(self):
+        run_utf8 = self.shell.run(command=['echo', 'hello world!'], encoding="utf-8")
+        self.assertEqual('hello world!\n', run_utf8.output)
+        run_iso = self.shell.run(command=['echo', 'hello world!'], encoding="iso-8859-1")
+        self.assertEqual('hello world!\n', run_iso.output)
+
+    def test_invalid_encoding(self):
+        lookuperr = None  # type: Optional[LookupError]
+        unknown_encoding = "this encoding doesn't exist"
+
+        try:
+            _ = self.shell.run(command=['echo', 'hello world!'], encoding=unknown_encoding)
+        except LookupError as err:
+            lookuperr = err
+        finally:
+            self.assertEqual("unknown encoding: {}".format(unknown_encoding), str(lookuperr))
+
     def test_check_output(self):
         out = self.shell.check_output(command=['echo', 'hello world!'])
-        self.assertEqual(out, 'hello world!\n')
+        self.assertEqual('hello world!\n', out)
 
     def test_stdout_redirection(self):
         with io.StringIO() as buf:
             self.shell.run(command=['echo', 'hello world!'], stdout=buf)
-            self.assertEqual(buf.getvalue(), "hello world!\n")
+            self.assertEqual("hello world!\n", buf.getvalue())
 
     def test_spawn(self):
         with io.StringIO() as buf:
             proc = self.shell.spawn(
                 command=['bash', '-c', 'for i in `seq 1 1000`; do echo hello world; sleep 0.0001; done'], stdout=buf)
             result = proc.wait_for_result()
-            self.assertEqual(result.return_code, 0)
+            self.assertEqual(0, result.return_code)
 
             expected = ''.join(["hello world\n"] * 1000)
-            self.assertEqual(buf.getvalue(), expected)
+            self.assertEqual(expected, buf.getvalue())
+
+
+class TestOpenWriteRead(unittest.TestCase):
+    def setUp(self):
+        self.shell = set_up()
+
+    def tearDown(self):
+        self.shell.close()
+
+    def test_open_write_read_text(self):
+
+        with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
+            pth = tmpdir.path / "oi"
+
+            with self.shell.open(remote_path=pth, mode='wt') as fid:
+                fid.write("hello")
+
+            with self.shell.open(remote_path=pth, mode='rt') as fid:
+                text = fid.read()
+
+            self.assertEqual("hello", text)
+
+    def test_open_write_read_binary(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
+            pth = tmpdir.path / "oi"
+
+            with self.shell.open(remote_path=pth, mode='wb') as fid:
+                fid.write(b"hello")
+
+            with self.shell.open(remote_path=pth, mode='rb') as fid:
+                data = fid.read()
+            self.assertEqual(b'hello', data)
+
+    def test_open_nonexsisting_parent_directory(self):  # pylint: disable=invalid-name
+        notfounderr = None  # type: Optional[FileNotFoundError]
+        try:
+            with self.shell.open(remote_path=pathlib.Path("/some/non-existing/path"), mode='wb'):
+                pass
+        except FileNotFoundError as err:
+            notfounderr = err
+
+        self.assertEqual("Parent directory of the file you want to open does not exist: /some/non-existing/path",
+                         str(notfounderr))
+
+    def test_read_nonexisting_file(self):
+        notfounderr = None  # type: Optional[FileNotFoundError]
+        try:
+            with self.shell.open(remote_path=pathlib.Path("/some/non-existing/path"), mode='rb'):
+                pass
+        except FileNotFoundError as err:
+            notfounderr = err
+
+        self.assertEqual("[Errno 2] No such file: /some/non-existing/path", str(notfounderr))
+
+    def test_open_write_read_without_permission(self):  # pylint: disable=invalid-name
+        with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
+            pth = tmpdir.path / "some-file"
+
+            with self.shell.open(remote_path=pth, mode='wt') as fid:
+                fid.write("hello")
+
+            try:
+                self.shell.chmod(remote_path=pth, mode=0o111)
+
+                with self.assertRaises(PermissionError):
+                    self.shell.open(remote_path=pth, mode="rt")
+                with self.assertRaises(PermissionError):
+                    self.shell.open(remote_path=pth, mode="wt")
+                with self.assertRaises(PermissionError):
+                    self.shell.open(remote_path=pth, mode="rb")
+                with self.assertRaises(PermissionError):
+                    self.shell.open(remote_path=pth, mode="wb")
+            finally:
+                self.shell.chmod(remote_path=pth, mode=0o777)
 
 
 class TestBasicIO(unittest.TestCase):
@@ -154,49 +265,6 @@ class TestBasicIO(unittest.TestCase):
 
     def tearDown(self):
         self.shell.close()
-
-    def test_open_write_read(self):
-        with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
-            pth = tmpdir.path / "oi"
-
-            # text
-            with self.shell.open(remote_path=pth, mode='wt') as fid:
-                fid.write("hello")
-
-            with self.shell.open(remote_path=pth, mode='rt') as fid:
-                text = fid.read()
-
-            self.assertEqual(text, "hello")
-
-            # binary
-            with self.shell.open(remote_path=pth, mode='wb') as fid:
-                fid.write(b"hello")
-
-            with self.shell.open(remote_path=pth, mode='rb') as fid:
-                data = fid.read()
-            self.assertEqual(data, b'hello')
-
-            # non-existing parent
-            notfounderr = None  # type: Optional[FileNotFoundError]
-            try:
-                with self.shell.open(remote_path=pathlib.Path("/some/non-existing/path"), mode='wb'):
-                    pass
-            except FileNotFoundError as err:
-                notfounderr = err
-
-            self.assertEqual(
-                str(notfounderr),
-                "Parent directory of the file you want to open does not exist: /some/non-existing/path")
-
-            # non-existing read
-            notfounderr = None  # type: Optional[FileNotFoundError]
-            try:
-                with self.shell.open(remote_path=pathlib.Path("/some/non-existing/path"), mode='rb'):
-                    pass
-            except FileNotFoundError as err:
-                notfounderr = err
-
-            self.assertEqual(str(notfounderr), "[Errno 2] No such file: /some/non-existing/path")
 
     def test_put_get(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
@@ -211,10 +279,14 @@ class TestBasicIO(unittest.TestCase):
                 another_local_pth = local_tmpdir.path / "some-other-dir" / "another_local"
                 self.shell.get(remote_path=pth, local_path=another_local_pth)
 
-                self.assertTrue(another_local_pth.exists())
-                self.assertEqual(another_local_pth.read_text(), "hello")
+                another_inconsistent_local_pth = local_tmpdir.path / "some-other-dir" / "another_inconsistent_local"
+                self.shell.get(remote_path=pth, local_path=another_inconsistent_local_pth, consistent=False)
 
-    def test_put_with_permission_error(self):
+                self.assertTrue(another_local_pth.exists())
+                self.assertEqual("hello", another_local_pth.read_text())
+                self.assertEqual("hello", another_inconsistent_local_pth.read_text())
+
+    def test_put_no_permission(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir:
             with temppathlib.TemporaryDirectory() as local_tmpdir:
                 local_pth = local_tmpdir.path / 'file.txt'
@@ -228,7 +300,7 @@ class TestBasicIO(unittest.TestCase):
                 self.shell.put(local_path=local_pth, remote_path=remote_pth, consistent=True)
 
                 a_stat = self.shell.stat(remote_path=remote_pth.as_posix())
-                self.assertEqual(a_stat.st_mode, 0o100444)
+                self.assertEqual(0o100444, a_stat.st_mode)
 
                 # direct put fails since we can not write to the file.
                 with self.assertRaises(PermissionError):
@@ -244,20 +316,47 @@ class TestBasicIO(unittest.TestCase):
                     self.shell.chmod(remote_path=remote_tmpdir.path, mode=0o777)
 
     def test_write_read_bytes(self):
-        with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
-            pth = tmpdir.path / "some-dir" / "oi"
 
+        for consistent in [True, False]:
+            with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
+                pth = tmpdir.path / "some-dir" / str(consistent)
+
+                self.shell.write_bytes(remote_path=pth, data=b"hello", consistent=consistent)
+                data = self.shell.read_bytes(remote_path=pth)
+                self.assertEqual(b"hello", data)
+
+    def test_read_bytes_no_permission(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir:
+            pth = remote_tmpdir.path / "some-file"
             self.shell.write_bytes(remote_path=pth, data=b"hello")
-            data = self.shell.read_bytes(remote_path=pth)
-            self.assertEqual(data, b"hello")
+            try:
+                self.shell.chmod(remote_path=pth, mode=0o111)
+
+                with self.assertRaises(PermissionError):
+                    self.shell.read_bytes(remote_path=pth)
+            finally:
+                self.shell.chmod(remote_path=pth, mode=0o777)
+
+    def test_read_bytes_not_found(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir:
+            pth = remote_tmpdir.path / "some-file"
+            notfounderr = None  # type: Optional[FileNotFoundError]
+
+            try:
+                self.shell.read_bytes(remote_path=pth)
+            except FileNotFoundError as err:
+                notfounderr = err
+
+            self.assertEqual("The remote path was not found: {}".format(pth), str(notfounderr))
 
     def test_write_read_text(self):
-        with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
-            pth = tmpdir.path / "some-dir" / "oi"
+        for consistent in [True, False]:
+            with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
+                pth = tmpdir.path / "some-dir" / str(consistent)
 
-            self.shell.write_text(remote_path=pth, text="hello")
-            text = self.shell.read_text(remote_path=pth)
-            self.assertEqual(text, "hello")
+                self.shell.write_text(remote_path=pth, text="hello", consistent=consistent)
+                text = self.shell.read_text(remote_path=pth)
+                self.assertEqual("hello", text)
 
 
 class TestMD5(unittest.TestCase):
@@ -277,7 +376,7 @@ class TestMD5(unittest.TestCase):
             md5digest = self.shell.md5(remote_path=pth)
 
             expected = hashlib.md5("hello".encode()).hexdigest()
-            self.assertEqual(md5digest, expected)
+            self.assertEqual(expected, md5digest)
 
     def test_md5s(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
@@ -295,7 +394,7 @@ class TestMD5(unittest.TestCase):
                     expected.append(None)
 
             md5s = self.shell.md5s(remote_paths=remote_pths)
-            self.assertListEqual(md5s, expected)
+            self.assertListEqual(expected, md5s)
 
 
 class TestFileOps(unittest.TestCase):
@@ -322,7 +421,7 @@ class TestFileOps(unittest.TestCase):
 
             # check with SFTP
             a_stat = self.shell.stat(pth.as_posix())
-            self.assertEqual(a_stat.st_mode, 0o40700)
+            self.assertEqual(0o40700, a_stat.st_mode)
 
             # does nothing
             self.shell.mkdir(remote_path=pth, mode=0o700, parents=True, exist_ok=True)
@@ -334,7 +433,7 @@ class TestFileOps(unittest.TestCase):
             except FileExistsError as err:
                 existserr = err
 
-            self.assertEqual(str(existserr), "The remote directory already exists: {}".format(pth))
+            self.assertEqual("The remote directory already exists: {}".format(pth), str(existserr))
 
             # existing directory does not raise an error on exist_ok=True
             self.shell.mkdir(remote_path=pth, mode=0o700, exist_ok=True)
@@ -403,14 +502,13 @@ class TestFileOps(unittest.TestCase):
             self.assertFalse(self.shell.is_symlink(pth_to_dir))
             self.assertTrue(self.shell.is_symlink(pth_to_dir_link))
 
-            os_err = None  # type: Optional[OSError]
+            notfounderr = None  # type: Optional[FileNotFoundError]
             try:
-                self.shell.is_dir(remote_path=pth_to_nonexisting)
-            except OSError as err:
-                os_err = err
+                self.shell.is_symlink(remote_path=pth_to_nonexisting)
+            except FileNotFoundError as err:
+                notfounderr = err
 
-            self.assertIsNotNone(os_err)
-            self.assertEqual("Remote file does not exist: {}".format(pth_to_nonexisting), str(os_err))
+            self.assertEqual("Remote file does not exist: {}".format(pth_to_nonexisting), str(notfounderr))
 
     def test_symlink(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
@@ -483,7 +581,18 @@ class TestRemove(unittest.TestCase):
     def test_file(self):
         for recursive in [True, False]:
             with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
+                # try to delete nonexisting file
+                notfounderr = None  # type: Optional[FileNotFoundError]
                 pth_to_file = tmpdir.path / "some-file"
+
+                try:
+                    self.shell.remove(remote_path=pth_to_file, recursive=recursive)
+                except FileNotFoundError as err:
+                    notfounderr = err
+
+                self.assertEqual("Remote file does not exist and thus can not be removed: {}".format(pth_to_file),
+                                 str(notfounderr))
+
                 self.shell.write_text(remote_path=pth_to_file, text="hello")
 
                 self.assertTrue(self.shell.exists(remote_path=pth_to_file))
@@ -587,7 +696,7 @@ class TestMirrorPermissions(unittest.TestCase):
                 local_path=local_tmpdir.path,
                 remote_path=remote_tmpdir.path)
 
-    def test_local_permissions_of_missing_files(self):  # pylint: disable=invalid-name
+    def test_local_permissions_missing_file(self):  # pylint: disable=invalid-name
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
                 temppathlib.TemporaryDirectory() as local_tmpdir:
             local_pth = local_tmpdir.path / "some-dir/some-file"
@@ -608,6 +717,55 @@ class TestMirrorPermissions(unittest.TestCase):
             self.assertEqual("Remote file to be chmod'ed does not exist: {}".format(
                 remote_tmpdir.path / "some-dir/some-file"), str(not_found_err))
 
+    def test_local_dir_permission_invalid_pth(self):  # pylint: disable=invalid-name
+        with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
+                temppathlib.TemporaryDirectory() as local_tmpdir:
+
+            local_dir = local_tmpdir.path / "some-nonexisting-dir"
+            notfounderr = None  # type: Optional[FileNotFoundError]
+
+            try:
+                self.shell.mirror_local_permissions(
+                    relative_paths=[pathlib.Path("some-relative-dir")],
+                    local_path=local_dir,
+                    remote_path=remote_tmpdir.path)
+            except FileNotFoundError as err:
+                notfounderr = err
+
+            self.assertEqual("Local path does not exist: {}".format(local_dir), str(notfounderr))
+
+            # file instead of dir as local path
+            local_file = local_tmpdir.path / "some-file"
+            local_file.write_text("hello")
+
+            local_direrr = None  # type: Optional[NotADirectoryError]
+
+            try:
+                self.shell.mirror_local_permissions(
+                    relative_paths=[pathlib.Path("some-relative-dir")],
+                    local_path=local_file,
+                    remote_path=remote_tmpdir.path)
+            except NotADirectoryError as err:
+                local_direrr = err
+
+            self.assertEqual("Local path is not a directory: {}".format(local_file), str(local_direrr))
+
+            # file instead of dir as remote path
+            remote_file = remote_tmpdir.path / "some-file"
+            self.shell.write_text(remote_path=remote_file, text="hello")
+
+            remote_direrr = None  # type: Optional[NotADirectoryError]
+
+            try:
+                self.shell.mirror_local_permissions(
+                    relative_paths=[pathlib.Path("some-relative-dir")],
+                    local_path=local_tmpdir.path,
+                    remote_path=remote_file)
+            except NotADirectoryError as err:
+                remote_direrr = err
+
+            self.assertEqual("Remote path is not a directory: {}".format(remote_file), str(remote_direrr))
+
 
 class TestSpurplusDirectoryDiff(unittest.TestCase):
     def setUp(self):
@@ -616,7 +774,94 @@ class TestSpurplusDirectoryDiff(unittest.TestCase):
     def tearDown(self):
         self.shell.close()
 
-    def test_that_it_works(self):
+    def test_nonexisting_remote_dir(self):
+        with temppathlib.TemporaryDirectory() as local_tmpdir, \
+                spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir:
+            # Set up local
+            local_only_dir = local_tmpdir.path / "local-only-dir"
+            local_only_dir.mkdir()
+
+            local_only_file = local_only_dir / "local-only-file"
+            local_only_file.write_text("hello")
+
+            # Inproperly set up remote
+            remote_tmpdir = remote_tmpdir.path / "nonexisting-remote-dir"
+
+            dir_diff = self.shell.directory_diff(local_path=local_tmpdir.path, remote_path=remote_tmpdir)
+
+            self.assertListEqual([pathlib.Path('local-only-dir/local-only-file')], dir_diff.local_only_files)
+            self.assertListEqual([pathlib.Path('local-only-dir')], dir_diff.local_only_directories)
+            self.assertListEqual([], dir_diff.identical_files)
+            self.assertListEqual([], dir_diff.common_directories)
+            self.assertListEqual([], dir_diff.remote_only_files)
+            self.assertListEqual([], dir_diff.remote_only_directories)
+
+    def test_nonexisting_local_dir(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir:
+            # Inproperly set up local
+            local_tmpdir = pathlib.Path("nonexisting")
+
+            # Set up remote
+            remote_only_dir = remote_tmpdir.path / "remote-only-dir"
+            self.shell.mkdir(remote_path=remote_only_dir)
+
+            remote_only_pth = remote_only_dir / "remote-only-file"
+            self.shell.write_text(remote_path=remote_only_pth, text="hello")
+
+            dir_diff = self.shell.directory_diff(local_path=local_tmpdir, remote_path=remote_tmpdir.path)
+
+            self.assertListEqual([], dir_diff.local_only_files)
+            self.assertListEqual([], dir_diff.local_only_directories)
+            self.assertListEqual([], dir_diff.identical_files)
+            self.assertListEqual([], dir_diff.common_directories)
+            self.assertListEqual([pathlib.Path('remote-only-dir/remote-only-file')], dir_diff.remote_only_files)
+            self.assertListEqual([pathlib.Path('remote-only-dir')], dir_diff.remote_only_directories)
+
+    def test_no_local_and_remote_dir(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir:
+            local_tmpdir = pathlib.Path("nonexisting-local-dir")
+            remote_tmpdir = remote_tmpdir.path / "nonexisting-remote-dir"
+
+            notfounderr = None  # type: Optional[FileNotFoundError]
+
+            try:
+                self.shell.directory_diff(local_path=local_tmpdir, remote_path=remote_tmpdir)
+            except FileNotFoundError as err:
+                notfounderr = err
+
+            self.assertEqual("Both the local and the remote path do not exist: {} and {}".format(
+                local_tmpdir, remote_tmpdir), str(notfounderr))
+
+    def test_file_instead_of_dir(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
+                temppathlib.TemporaryDirectory() as local_tmpdir:
+
+            local_file = local_tmpdir.path / "local-file"
+            local_file.write_text("hello")
+
+            remote_file = remote_tmpdir.path / "remote-file"
+            self.shell.write_text(remote_path=remote_file, text="hello")
+
+            local_direrr = None  # type: Optional[NotADirectoryError]
+            remote_direrr = None  # type: Optional[NotADirectoryError]
+
+            try:
+                self.shell.directory_diff(local_path=local_file, remote_path=remote_tmpdir.path)
+            except NotADirectoryError as err:
+                local_direrr = err
+
+            self.assertEqual("Local path is not a directory: {}".format(local_file), str(local_direrr))
+
+            try:
+                self.shell.directory_diff(local_path=local_tmpdir.path, remote_path=remote_file)
+            except NotADirectoryError as err:
+                remote_direrr = err
+
+            a_stat = self.shell.stat(remote_path=remote_file)
+            self.assertEqual("Remote path is not a directory: {} (mode: {})".format(remote_file, a_stat.st_mode),
+                             str(remote_direrr))
+
+    def test_existing_dirs(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
                 temppathlib.TemporaryDirectory() as local_tmpdir:
             # Set up local
@@ -677,7 +922,7 @@ class TestSpurplusSyncToRemote(unittest.TestCase):
             local_pth_to_file.parent.mkdir()
             local_pth_to_file.write_text("hello")
 
-            remote_pth_to_file = local_tmpdir.path / "some-dir/some-file"
+            remote_pth_to_file = remote_tmpdir.path / "some-dir/some-file"
 
             self.shell.sync_to_remote(local_path=local_tmpdir.path, remote_path=remote_tmpdir.path)
 
@@ -840,6 +1085,35 @@ class TestSpurplusSyncToRemote(unittest.TestCase):
             self.assertEqual(0o100603, self.shell.stat(remote_path=remote_common_file).st_mode)
             self.assertEqual(0o100604, self.shell.stat(remote_path=remote_different_file).st_mode)
             self.assertEqual(0o040705, self.shell.stat(remote_path=remote_common_dir).st_mode)
+
+    def test_nonexisting_local_path(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
+                temppathlib.TemporaryDirectory() as local_tmpdir:
+            local_pth = local_tmpdir.path / "some-dir"
+
+            notfounderr = None  # type: Optional[FileNotFoundError]
+
+            try:
+                self.shell.sync_to_remote(local_path=local_pth, remote_path=remote_tmpdir.path)
+            except FileNotFoundError as err:
+                notfounderr = err
+
+            self.assertEqual("Local path does not exist: {}".format(local_pth), str(notfounderr))
+
+    def test_local_path_is_not_a_dir(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
+                temppathlib.TemporaryDirectory() as local_tmpdir:
+            local_pth_to_file = local_tmpdir.path / "some-file"
+            local_pth_to_file.write_text("hello")
+
+            direrr = None  # type: Optional[NotADirectoryError]
+
+            try:
+                self.shell.sync_to_remote(local_path=local_pth_to_file, remote_path=remote_tmpdir.path)
+            except NotADirectoryError as err:
+                direrr = err
+
+            self.assertEqual("Local path is not a directory: {}".format(local_pth_to_file), str(direrr))
 
 
 @unittest.skip("executed only on demand")

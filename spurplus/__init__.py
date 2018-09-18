@@ -13,6 +13,7 @@ import time
 import uuid
 from typing import Optional, Union, TextIO, BinaryIO, List, Dict, Sequence, Set
 
+import icontract
 import paramiko
 import spur
 import spur.results
@@ -107,7 +108,7 @@ class DirectoryDiff:
         self.remote_only_directories = []  # type: List[pathlib.Path]
 
 
-class SshShell:
+class SshShell(icontract.DBC):
     """
     Wrap a spur.SshShell instance.
 
@@ -203,9 +204,6 @@ class SshShell:
 
         """
         # pylint: disable=too-many-arguments
-
-        if not isinstance(encoding, str):
-            raise ValueError("encoding must be specified, but got: {!r}".format(encoding))
 
         return self.spawn(
             command=command,
@@ -1033,9 +1031,11 @@ class SshShell:
         self.close()
 
 
-class TemporaryDirectory:
+class TemporaryDirectory(icontract.DBC):
     """Represent a remote temporary directory."""
 
+    @icontract.pre(lambda prefix: prefix is None or '/' not in prefix)
+    @icontract.pre(lambda suffix: suffix is None or '/' not in suffix)
     def __init__(self,
                  shell: SshShell,
                  prefix: Optional[str] = None,
@@ -1049,12 +1049,6 @@ class TemporaryDirectory:
         :param suffix: if specified, suffix of the directory file name
         :param tmpdir: if specified, base directory in which the temporary directory will be created
         """
-        if prefix is not None and '/' in prefix:
-            raise ValueError("Unexpected slash ('/') in prefix: {}".format(prefix))
-
-        if suffix is not None and '/' in suffix:
-            raise ValueError("Unexpected slash ('/') in suffix: {}".format(suffix))
-
         self.shell = shell
 
         cmd = ['mktemp', '--directory']
@@ -1088,6 +1082,7 @@ class TemporaryDirectory:
         self.shell.run(command=['rm', '-rf', self.path.as_posix()])
 
 
+@icontract.pre(lambda retries: retries >= 0)
 def connect_with_retries(hostname: str,
                          username: Optional[str] = None,
                          password: Optional[str] = None,
@@ -1155,8 +1150,6 @@ def connect_with_retries(hostname: str,
     """
     # pylint: disable=too-many-locals
     # pylint: disable=too-many-arguments
-    if retries < 0:
-        raise ValueError("Expected non-negative number of retries, got: {}".format(retries))
 
     private_key_file_str = None
     if private_key_file is not None:
@@ -1215,6 +1208,8 @@ def connect_with_retries(hostname: str,
         raise ConnectionError("Failed to connect after {} retries to {}: {}".format(retries, hostname, last_err))
 
 
+@icontract.pre(lambda argc_max: argc_max > 0)
+@icontract.pre(lambda arg_max: arg_max > 0)
 def chunk_arguments(args: List[str], arg_max: int = 16 * 1024, argc_max=1024) -> List[List[str]]:
     """
     Split a long list of command-line arguments into chunks.
@@ -1226,12 +1221,6 @@ def chunk_arguments(args: List[str], arg_max: int = 16 * 1024, argc_max=1024) ->
     :param argc_max: maximum number of command-line arguments
     :return: chunked command-line arguments
     """
-    if argc_max <= 0:
-        raise ValueError("Expected positive non-zero argc_max, got: {}".format(argc_max))
-
-    if arg_max <= 0:
-        raise ValueError("Expected positive non-zero arg_max, got: {}".format(arg_max))
-
     for i, arg in enumerate(args):
         if len(arg) > arg_max:
             if len(arg) > 50:

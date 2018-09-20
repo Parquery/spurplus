@@ -29,16 +29,16 @@ class ReconnectingSFTP:
         self.max_retries = max_retries
         self.retry_period = retry_period
 
-        self.__sftp = None  # type: Optional[paramiko.SFTP]
+        self._sftp = None  # type: Optional[paramiko.SFTP]
 
         # last recorded working directory
         self.last_working_directory = None  # type: Optional[str]
 
     def close(self) -> None:
         """Close the the underlying paramiko SFTP client."""
-        if self.__sftp is not None:
-            self.__sftp.close()
-            self.__sftp = None
+        if self._sftp is not None:
+            self._sftp.close()
+            self._sftp = None
 
     def __enter__(self) -> 'ReconnectingSFTP':
         """Return self prepared in a constructor upon enter."""
@@ -63,21 +63,25 @@ class ReconnectingSFTP:
         success = False
         for _ in range(0, self.max_retries):
             try:
-                if self.__sftp is None:
-                    self.__sftp = self.__sftp_opener()
-                assert self.__sftp is not None
+                if self._sftp is None:
+                    self._sftp = self.__sftp_opener()
+                assert self._sftp is not None
+
+                if self._sftp.sock.closed:
+                    self._sftp = self.__sftp_opener()
+                assert not self._sftp.sock.closed
 
                 if self.last_working_directory is not None:
-                    self.__sftp.chdir(path=self.last_working_directory)
+                    self._sftp.chdir(path=self.last_working_directory)
 
                 success = True
 
             except (socket.error, EOFError) as err:
                 last_err = err
 
-                if self.__sftp is not None:
-                    self.__sftp.close()
-                    self.__sftp = None
+                if self._sftp is not None:
+                    self._sftp.close()
+                    self._sftp = None
 
                 time.sleep(self.retry_period)
 
@@ -86,7 +90,7 @@ class ReconnectingSFTP:
                 "Failed to execute an SFTP command after {} retries due to connection failure: {}".format(
                     self.max_retries, last_err))
 
-        return method(self.__sftp)
+        return method(self._sftp)
 
     def listdir(self, path='.'):
         """See paramiko.SFTP documentation."""

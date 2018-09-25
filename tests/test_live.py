@@ -3,50 +3,18 @@
 # pylint: disable=missing-docstring
 import hashlib
 import io
-import os
 import pathlib
 import time
 import unittest
 import uuid
 from typing import Optional, List  # pylint: disable=unused-import
 
-import spur.ssh
 import temppathlib
 
 import spurplus
+import tests.common
 
 # pylint: disable=too-many-lines
-
-
-class Params:
-    """ represents parameters used to connect to the server. """
-
-    def __init__(self) -> None:
-        self.hostname = ''
-        self.port = None  # type: Optional[int]
-        self.username = None  # type: Optional[str]
-        self.password = None  # type: Optional[str]
-        self.private_key_file = None  # type: Optional[pathlib.Path]
-
-
-def params_from_environ() -> Params:
-    params = Params()
-
-    params.hostname = os.environ.get("TEST_SSH_HOSTNAME", "127.0.0.1")
-
-    if 'TEST_SSH_PORT' in os.environ:
-        params.port = int(os.environ['TEST_SSH_PORT'])
-
-    if 'TEST_SSH_USERNAME' in os.environ:
-        params.username = os.environ['TEST_SSH_USERNAME']
-
-    if 'TEST_SSH_PASSWORD' in os.environ:
-        params.password = str(os.environ['TEST_SSH_PASSWORD'])
-
-    if 'TEST_SSH_PRIVATE_KEY_FILE' in os.environ:
-        params.private_key_file = pathlib.Path(os.environ['TEST_SSH_PRIVATE_KEY_FILE'])
-
-    return params
 
 
 class TestReconnection(unittest.TestCase):
@@ -62,31 +30,9 @@ class TestReconnection(unittest.TestCase):
             "Original error: [Errno -2] Name or service not known", str(connerr))
 
 
-def set_up() -> spurplus.SshShell:
-    """sets up a shell to the testing instance."""
-    params = params_from_environ()
-
-    try:
-        shell = spurplus.connect_with_retries(
-            hostname=params.hostname,
-            port=params.port,
-            username=params.username,
-            password=params.password,
-            private_key_file=params.private_key_file,
-            missing_host_key=spur.ssh.MissingHostKey.accept,
-            retries=2,
-            retry_period=1)
-    except ConnectionError as err:
-        raise ConnectionError("Failed to connect to {}@{}:{}, private key file: {}, password is not None: {}".format(
-            params.username, params.hostname, params.port, params.private_key_file,
-            params.password is not None)) from err
-
-    return shell
-
-
 class TestTemporaryDirs(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()
@@ -140,7 +86,7 @@ class TestTemporaryDirs(unittest.TestCase):
 
 class TestRun(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()
@@ -187,7 +133,7 @@ class TestRun(unittest.TestCase):
 
 class TestOpenWriteRead(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()
@@ -261,7 +207,7 @@ class TestOpenWriteRead(unittest.TestCase):
 
 class TestBasicIO(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()
@@ -361,7 +307,7 @@ class TestBasicIO(unittest.TestCase):
 
 class TestMD5(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()
@@ -399,7 +345,7 @@ class TestMD5(unittest.TestCase):
 
 class TestFileOps(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()
@@ -573,7 +519,7 @@ class TestFileOps(unittest.TestCase):
 
 class TestRemove(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()
@@ -674,7 +620,7 @@ class TestRemove(unittest.TestCase):
 
 class TestMirrorPermissions(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()
@@ -769,7 +715,7 @@ class TestMirrorPermissions(unittest.TestCase):
 
 class TestSpurplusDirectoryDiff(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()
@@ -910,7 +856,7 @@ class TestSpurplusDirectoryDiff(unittest.TestCase):
 
 class TestSpurplusSyncToRemote(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()
@@ -1119,7 +1065,7 @@ class TestSpurplusSyncToRemote(unittest.TestCase):
 @unittest.skip("executed only on demand")
 class TestBenchmark(unittest.TestCase):
     def setUp(self):
-        self.shell = set_up()
+        self.shell = tests.common.set_up_test_shell()
 
     def tearDown(self):
         self.shell.close()

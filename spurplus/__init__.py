@@ -4,6 +4,7 @@
 import contextlib
 import enum
 import hashlib
+import io
 import os
 import pathlib
 import shutil
@@ -13,12 +14,12 @@ import time
 import uuid
 from typing import Optional, Union, TextIO, BinaryIO, List, Dict, Sequence, Set
 
-import icontract
 import paramiko
 import spur
 import spur.results
 import spur.ssh
 
+import icontract
 import spurplus.sftp
 
 # pylint: disable=protected-access
@@ -312,7 +313,11 @@ class SshShell(icontract.DBC):
         openerr = None  # type: Optional[Union[FileNotFoundError, PermissionError]]
 
         try:
-            return self._spur.open(name=rmt_pth.as_posix(), mode=mode)
+            sftp_file = self._sftp.open(rmt_pth.as_posix(), mode=mode)
+            if "b" not in mode:
+                sftp_file = io.TextIOWrapper(sftp_file)
+
+            return sftp_file
 
         except (FileNotFoundError, PermissionError) as err:
             openerr = err
@@ -1158,7 +1163,7 @@ def connect_with_retries(hostname: str,
         else:
             private_key_file_str = private_key_file.as_posix()
 
-    retries_left = retries
+    ssh_retries_left = retries
 
     last_err = None  # type: Union[None, Exception]
     bad_host_key_err = None  # type: Optional[ConnectionError]
@@ -1179,6 +1184,10 @@ def connect_with_retries(hostname: str,
                 sock=sock)
             spur_ssh_shell.run(command=['sh', '-c', 'echo hello > /dev/null'])
 
+            # "ssh_retries_left" differ from ReconnectingSFTP retries and will not be returned to the SShShell.
+            # "ssh_retries_left" is a value for how many times the ssh connection will be reestablished while
+            # "max_retries" of ReconnectingSFTP stands for how many time the function in the wrapper will be retried
+            # before raising a ConnectionError. Therefore never set "max_retries" equal "ssh_retries_left".
             sftp = spurplus.sftp.ReconnectingSFTP(sftp_opener=spur_ssh_shell._open_sftp_client)
 
             shell = SshShell(spur_ssh_shell=spur_ssh_shell, sftp=sftp)
@@ -1196,8 +1205,8 @@ def connect_with_retries(hostname: str,
                 break
 
             last_err = err
-            retries_left -= 1
-            if retries_left > 0:
+            ssh_retries_left -= 1
+            if ssh_retries_left > 0:
                 time.sleep(retry_period)
             else:
                 break

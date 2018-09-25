@@ -184,6 +184,7 @@ Namely, we use:
 * The style of the docstrings is checked with `pydocstyle <https://github.com/PyCQA/pydocstyle>`_.
 * Static type analysis is performed with `mypy <http://mypy-lang.org/>`_.
 * Various linter checks are done with `pylint <https://www.pylint.org/>`_.
+* Doctests are executed using the Python `doctest module <https://docs.python.org/3.5/library/doctest.html>`_.
 
 Run the pre-commit checks locally from an activated virtual environment with development dependencies:
 

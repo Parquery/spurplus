@@ -18,6 +18,7 @@ import paramiko
 import spur
 import spur.results
 import spur.ssh
+import temppathlib
 
 import icontract
 import spurplus.sftp
@@ -298,44 +299,6 @@ class SshShell(icontract.DBC):
             encoding=encoding,
             use_pty=use_pty)
 
-    def open(self, remote_path: Union[str, pathlib.Path], mode: str = "r") -> Union[TextIO, BinaryIO]:
-        """
-        Open a file for reading or writing.
-
-        By default, files are opened in text mode. Appending "b" to the mode will open the file in binary mode.
-
-        :param remote_path: to the file
-        :param mode: open mode
-        :return: file descriptor
-        """
-        rmt_pth = remote_path if isinstance(remote_path, pathlib.Path) else pathlib.Path(remote_path)
-
-        openerr = None  # type: Optional[Union[FileNotFoundError, PermissionError]]
-
-        try:
-            sftp_file = self._sftp.open(rmt_pth.as_posix(), mode=mode)
-            if "b" not in mode:
-                sftp_file = io.TextIOWrapper(sftp_file)
-
-            return sftp_file
-
-        except (FileNotFoundError, PermissionError) as err:
-            openerr = err
-
-        if isinstance(openerr, FileNotFoundError):
-            if 'w' in mode:
-                if not self.exists(remote_path=rmt_pth.parent):
-                    raise FileNotFoundError(
-                        "Parent directory of the file you want to open does not exist: {}".format(remote_path))
-
-            raise FileNotFoundError("{}: {}".format(openerr, remote_path))
-
-        elif isinstance(openerr, PermissionError):
-            raise PermissionError("{}: {}".format(openerr, remote_path))
-
-        else:
-            raise NotImplementedError("Unhandled error type: {}: {}".format(type(openerr), openerr))
-
     def md5(self, remote_path: Union[str, pathlib.Path]) -> str:
         """
         Compute MD5 checksum of the remote file. It is assumed that md5sum command is available on the remote machine.
@@ -485,6 +448,8 @@ class SshShell(icontract.DBC):
         """
         Write the binary data to a remote file.
 
+        First, the data is written to a temporary local file. Next the local file is transferred to the remote path
+        making sure that the connection is reestablished if needed.
         :param remote_path: to the file
         :param data: to be written
         :param create_directories: if set, creates the parent directory of the remote path with mode 0o777
@@ -495,31 +460,13 @@ class SshShell(icontract.DBC):
 
         if create_directories:
             spurplus.sftp._mkdir(sftp=self._sftp, remote_path=rmt_pth.parent, mode=0o777, parents=True, exist_ok=True)
-
-        if consistent:
-            tmp_pth = rmt_pth.parent / (rmt_pth.name + ".{}".format(uuid.uuid4()))
-
-            def cleanup() -> None:
-                # pylint: disable=missing-docstring
-                try:
-                    self._sftp.remove(path=tmp_pth.as_posix())
-                except:  # pylint: disable=bare-except
-                    pass
-
-            with contextlib.ExitStack() as exit_stack:
-                exit_stack.callback(callback=cleanup)
-
-                fid = self._sftp.open(tmp_pth.as_posix(), mode='wb')
-                exit_stack.push(fid)
-
-                fid.write(data)
-                fid.flush()
-                fid.close()
-
-                self._sftp.posix_rename(oldpath=tmp_pth.as_posix(), newpath=rmt_pth.as_posix())
-        else:
-            with self._sftp.open(rmt_pth.as_posix(), mode='wb') as fid:
-                fid.write(data)
+        with temppathlib.NamedTemporaryFile() as tmp:
+            tmp.path.write_bytes(data)
+            self.put(
+                local_path=tmp.path.as_posix(),
+                remote_path=rmt_pth.as_posix(),
+                consistent=consistent,
+                create_directories=create_directories)
 
     def write_text(self,
                    remote_path: Union[str, pathlib.Path],
@@ -785,31 +732,20 @@ class SshShell(icontract.DBC):
         if create_directories:
             loc_pth.parent.mkdir(mode=0o777, exist_ok=True, parents=True)
 
-        with self._spur.open(rmt_pth_str, 'rb') as fsrc:
-            if not consistent:
-                with loc_pth.open('wb') as fdst:
-                    shutil.copyfileobj(fsrc=fsrc, fdst=fdst)
-            else:
-                tmp_pth = loc_pth.parent / (loc_pth.name + ".{}.tmp".format(uuid.uuid4()))
-                success = False
-
-                try:
-                    with tmp_pth.open('wb') as fdst:
-                        shutil.copyfileobj(fsrc=fsrc, fdst=fdst)
-
-                    tmp_pth.rename(loc_pth)
-                    success = True
-                finally:
-                    if not success:
-                        try:
-                            tmp_pth.unlink()
-                        except:  # pylint: disable=bare-except
-                            pass
+        if consistent:
+            with temppathlib.TemporaryDirectory() as local_tmpdir:
+                tmp_pth = local_tmpdir.path / str(uuid.uuid4())
+                self._sftp.get(remotepath=rmt_pth_str, localpath=tmp_pth.as_posix())
+                shutil.move(src=tmp_pth.as_posix(), dst=loc_pth.as_posix())
+        else:
+            self._sftp.get(remotepath=rmt_pth_str, localpath=loc_pth.as_posix())
 
     def read_bytes(self, remote_path: Union[str, pathlib.Path]) -> bytes:
         """
         Read the binary data from a remote file.
 
+        First the remote file is copied to a temporary local file making sure that the connection is reestablished if
+        needed. Next the data is read.
         :param remote_path: to the file
         :return: binary content of the file
         """
@@ -818,8 +754,9 @@ class SshShell(icontract.DBC):
         permerr = None  # type: Optional[PermissionError]
         notfounderr = None  # type: Optional[FileNotFoundError]
         try:
-            with self._spur.open(name=rmt_pth_str, mode='rb') as fid:
-                return fid.read()
+            with temppathlib.NamedTemporaryFile() as tmp:
+                self.get(remote_path=rmt_pth_str, local_path=tmp.path.as_posix(), consistent=True)
+                return tmp.path.read_bytes()
         except PermissionError as err:
             permerr = err
         except FileNotFoundError as err:
@@ -1036,7 +973,7 @@ class SshShell(icontract.DBC):
         self.close()
 
 
-class TemporaryDirectory(icontract.DBC):
+class TemporaryDirectory(metaclass=icontract.DBCMeta):
     """Represent a remote temporary directory."""
 
     @icontract.pre(lambda prefix: prefix is None or '/' not in prefix)

@@ -6,6 +6,7 @@ import unittest
 from typing import Optional  # pylint: disable=unused-import
 
 import spurplus
+import spurplus.sftp
 
 
 class TestChunkArguments(unittest.TestCase):

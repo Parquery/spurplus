@@ -24,7 +24,6 @@ class Params:
 
 def params_from_environ() -> Params:
     params = Params()
-
     params.hostname = os.environ.get("TEST_SSH_HOSTNAME", "127.0.0.1")
 
     if 'TEST_SSH_PORT' in os.environ:

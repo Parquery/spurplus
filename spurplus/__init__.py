@@ -117,6 +117,12 @@ class SshShell(icontract.DBC):
     This wrapper adds typing and support for pathlib.Path and facilitates common tasks such as md5 sum computation and
     file operations.
 
+    :ivar hostname: host name of the machine
+    :vartype hostname: str
+
+    :ivar port: port of the SSH connection
+    :vartype port: int
+
     """
 
     # pylint: disable=too-many-public-methods
@@ -139,6 +145,9 @@ class SshShell(icontract.DBC):
 
         self.close_spur_shell = close_spur_shell
         self.close_sftp = close_sftp
+
+        self.hostname = spur_ssh_shell._hostname
+        self.port = spur_ssh_shell._port
 
     def as_spur(self) -> spur.ssh.SshShell:
         """

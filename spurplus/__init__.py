@@ -457,6 +457,7 @@ class SshShell(icontract.DBC):
 
         First, the data is written to a temporary local file. Next the local file is transferred to the remote path
         making sure that the connection is reestablished if needed.
+
         :param remote_path: to the file
         :param data: to be written
         :param create_directories: if set, creates the parent directory of the remote path with mode 0o777
@@ -753,6 +754,7 @@ class SshShell(icontract.DBC):
 
         First the remote file is copied to a temporary local file making sure that the connection is reestablished if
         needed. Next the data is read.
+
         :param remote_path: to the file
         :return: binary content of the file
         """

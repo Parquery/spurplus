@@ -104,12 +104,6 @@ class ReconnectingSFTP:
         """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.listdir_iter(path, read_aheads))
 
-    def open(self, filename, mode='r', bufsize=-1):
-        """See paramiko.SFTP documentation."""
-        return self.__wrap(method=lambda sftp: sftp.open(filename, mode, bufsize))
-
-    file = open
-
     def remove(self, path):
         """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.remove(path))

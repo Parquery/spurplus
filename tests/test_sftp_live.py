@@ -10,6 +10,7 @@ import paramiko
 import temppathlib
 
 import spurplus
+import spurplus.sftp
 import tests.common
 
 

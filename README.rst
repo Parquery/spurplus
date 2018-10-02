@@ -59,7 +59,7 @@ functionality out-of-the-box, we missed certain features:
   call in order to prevent issues with time-outs, `spurplus.SshShell` is able to re-use the SFTP client over multiple
   calls via ``spurplus.sftp.ReconnectingSFTP``.
 
-  This can lead up to 25x speed-up (see the benchmark in ``tests/live_test.py``).
+  This can lead up to 10x speed-up (see the benchmark in ``tests/live_test.py``).
 
 .. _Spur: https://github.com/mwilliamson/spur.py
 .. _Paramiko: https://github.com/paramiko/paramiko
@@ -69,7 +69,6 @@ Usage
 .. code-block:: python
 
     import pathlib
-    import contextlib
 
     import spurplus
 
@@ -107,7 +106,7 @@ Usage
         # Use a wrapped SFTP client
         sftp = shell.as_sftp()
         # Do something with the SFTP
-        for attr in sftp.listdir_iter(path=p.as_posix()):
+        for attr in sftp.listdir_attr(path=p.as_posix()):
             do_something(attr.filename, attr.st_size)
 
 Documentation

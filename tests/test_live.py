@@ -31,6 +31,27 @@ class TestReconnection(unittest.TestCase):
             "Original error: [Errno -2] Name or service not known", str(connerr))
 
 
+class TestProperties(unittest.TestCase):
+    def setUp(self):
+        self.shell = tests.common.set_up_test_shell()
+
+    def tearDown(self):
+        self.shell.close()
+
+    def test_hostname(self):
+        params = tests.common.params_from_environ()
+        self.assertEqual(params.hostname, self.shell.hostname)
+
+    def test_port(self):
+        params = tests.common.params_from_environ()
+
+        # The default port 22 is set even if None was supplied to the spur.
+        if params.port is None:
+            self.assertEqual(22, self.shell.port)
+        else:
+            self.assertEqual(params.port, self.shell.port)
+
+
 class TestTemporaryDirs(unittest.TestCase):
     def setUp(self):
         self.shell = tests.common.set_up_test_shell()

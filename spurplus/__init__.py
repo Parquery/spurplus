@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Manage remote machines and perform file operations over SSH."""
 
-import contextlib
 import enum
 import hashlib
-import io
 import os
 import pathlib
 import shutil
@@ -12,7 +10,7 @@ import socket
 import stat as stat_module
 import time
 import uuid
-from typing import Optional, Union, TextIO, BinaryIO, List, Dict, Sequence, Set
+from typing import Optional, Union, TextIO, List, Dict, Sequence, Set
 
 import paramiko
 import spur

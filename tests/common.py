@@ -4,7 +4,7 @@
 
 import os
 import pathlib
-from typing import Optional, List, Union  # pylint: disable=unused-import
+from typing import Optional  # pylint: disable=unused-import
 
 import spur.ssh
 

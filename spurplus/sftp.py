@@ -92,27 +92,15 @@ class ReconnectingSFTP:
 
         return method(self._sftp)
 
-    def listdir(self, path='.'):
-        """See paramiko.SFTP documentation."""
-        return self.__wrap(method=lambda sftp: sftp.listdir(path))
-
     def listdir_attr(self, path='.'):
         """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.listdir_attr(path))
-
-    def listdir_iter(self, path='.', read_aheads=50):
-        """See paramiko.SFTP documentation."""
-        return self.__wrap(method=lambda sftp: sftp.listdir_iter(path, read_aheads))
 
     def remove(self, path):
         """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.remove(path))
 
     unlink = remove
-
-    def rename(self, oldpath, newpath):
-        """See paramiko.SFTP documentation."""
-        return self.__wrap(method=lambda sftp: sftp.rename(oldpath, newpath))
 
     def posix_rename(self, oldpath, newpath):
         """See paramiko.SFTP documentation."""
@@ -146,50 +134,9 @@ class ReconnectingSFTP:
         """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.chown(path, uid, gid))
 
-    def utime(self, path, times):
-        """See paramiko.SFTP documentation."""
-        return self.__wrap(method=lambda sftp: sftp.utime(path, times))
-
-    def truncate(self, path, size):
-        """See paramiko.SFTP documentation."""
-        return self.__wrap(method=lambda sftp: sftp.truncate(path, size))
-
-    def readlink(self, path):
-        """See paramiko.SFTP documentation."""
-        return self.__wrap(method=lambda sftp: sftp.readlink(path))
-
-    def normalize(self, path):
-        """See paramiko.SFTP documentation."""
-        return self.__wrap(method=lambda sftp: sftp.normalize(path))
-
-    def chdir(self, path=None):
-        """See paramiko.SFTP documentation."""
-        result = self.__wrap(method=lambda sftp: sftp.chdir(path))
-
-        self.last_working_directory = path
-
-        return result
-
-    def getcwd(self):
-        """See paramiko.SFTP documentation."""
-        return self.__wrap(method=lambda sftp: sftp.getcwd())
-
-    def putfo(self, fl, remotepath, file_size=0, callback=None, confirm=True):
-        """See paramiko.SFTP documentation."""
-        # pylint: disable=invalid-name
-        # pylint: disable=too-many-arguments
-
-        return self.__wrap(method=lambda sftp: sftp.putfo(fl, remotepath, file_size, callback, confirm))
-
     def put(self, localpath, remotepath, callback=None, confirm=True):
         """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.put(localpath, remotepath, callback, confirm))
-
-    def getfo(self, remotepath, fl, callback=None):
-        """See paramiko.SFTP documentation."""
-        # pylint: disable=invalid-name
-        # pylint: disable=too-many-arguments
-        return self.__wrap(method=lambda sftp: sftp.getfo(remotepath, fl, callback))
 
     def get(self, remotepath, localpath, callback=None):
         """See paramiko.SFTP documentation."""

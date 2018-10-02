@@ -1,3 +1,10 @@
+2.0.0
+=====
+* Removed all functions from ``spurplus.sftp`` that ``spurplus`` does not use
+* Added ``hostname`` and ``port`` property to SshShell
+* Removed ``open()`` from ``spurplus.sftp`` and ``spurplus``. Get/put operations are now atomic when reconnecting
+* Improved tests of ``spurplus.sftp``
+
 1.2.5
 =====
 * Fixed problems with version.txt files

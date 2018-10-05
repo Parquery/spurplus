@@ -965,6 +965,11 @@ class SshShell(icontract.DBC):
         """
         self._sftp.chown(path=str(remote_path), uid=uid, gid=gid)
 
+    @icontract.post(lambda result: result == result.strip(), enabled=icontract.SLOW)
+    def whoami(self) -> str:
+        """Execute the `whoami` command and return the user name."""
+        return self.check_output(command=['whoami']).strip()
+
     def close(self) -> None:
         """Close the underlying spur shell and SFTP (if ``close_spur_shell`` and ``close_sftp``, respectively)."""
         if self.close_spur_shell:

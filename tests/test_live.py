@@ -1009,6 +1009,18 @@ class TestSpurplusSyncToRemote(unittest.TestCase):
             self.assertEqual("Local path is not a directory: {}".format(local_pth_to_file), str(direrr))
 
 
+class TestWhoami(unittest.TestCase):
+    def setUp(self):
+        self.shell = tests.common.set_up_test_shell()
+
+    def tearDown(self):
+        self.shell.close()
+
+    def test_that_it_works(self):
+        params = tests.common.params_from_environ()
+        self.assertEqual(params.username, self.shell.whoami())
+
+
 @unittest.skip("executed only on demand")
 class TestBenchmark(unittest.TestCase):
     def setUp(self):

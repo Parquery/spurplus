@@ -1,3 +1,7 @@
+2.1.0
+=====
+* Added ``whoami`` to ``spurplus.SshShell``
+
 2.0.0
 =====
 * Removed all functions from ``spurplus.sftp`` that ``spurplus`` does not use

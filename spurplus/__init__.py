@@ -8,6 +8,7 @@ import pathlib
 import shutil
 import socket
 import stat as stat_module
+import subprocess
 import time
 import uuid
 from typing import Optional, Union, TextIO, List, Dict, Sequence, Set
@@ -652,8 +653,9 @@ class SshShell(icontract.DBC):
                 except OSError as err:
                     raise OSError("Failed to remove the file: {}".format(remote_pth / rel_pth)) from err
 
-            for rel_pth in dir_diff.remote_only_directories:
-                self.remove(remote_path=remote_pth / rel_pth, recursive=True)
+            # We need to go in reverse order in order to delete the children before the parent directories.
+            for rel_pth in reversed(sorted(dir_diff.remote_only_directories)):
+                self.remove(remote_path=remote_pth / rel_pth, recursive=False)
 
         # Create directories missing on the remote
         for rel_pth in dir_diff.local_only_directories:
@@ -684,8 +686,9 @@ class SshShell(icontract.DBC):
                 except OSError as err:
                     raise OSError("Failed to remove the file: {}".format(remote_pth / rel_pth)) from err
 
-            for rel_pth in dir_diff.remote_only_directories:
-                self.remove(remote_path=remote_pth / rel_pth, recursive=True)
+            # We need to go in reverse order in order to delete the children before the parent directories.
+            for rel_pth in reversed(sorted(dir_diff.remote_only_directories)):
+                self.remove(remote_path=remote_pth / rel_pth, recursive=False)
 
     def mirror_local_permissions(self, relative_paths: Sequence[Union[str, pathlib.Path]],
                                  local_path: Union[str, pathlib.Path], remote_path: Union[str, pathlib.Path]) -> None:

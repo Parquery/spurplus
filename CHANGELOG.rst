@@ -1,3 +1,7 @@
+2.1.1
+=====
+* Fixed ``sync_to_remote`` to delete children before parent directories
+
 2.1.0
 =====
 * Added ``whoami`` to ``spurplus.SshShell``

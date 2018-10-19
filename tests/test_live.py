@@ -931,6 +931,26 @@ class TestSpurplusSyncToRemote(unittest.TestCase):
 
                 self.assertFalse(self.shell.exists(remote_path=remote_pth_to_dir))
 
+    def test_remote_subdir_is_deleted(self):
+        for delete in [spurplus.Delete.BEFORE, spurplus.Delete.AFTER]:
+            with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
+                    temppathlib.TemporaryDirectory() as local_tmpdir:
+                remote_pth_to_dir = remote_tmpdir.path / "some-dir"
+                self.shell.mkdir(remote_path=remote_pth_to_dir)
+                self.shell.write_text(remote_path=remote_pth_to_dir / "some-file", text="hello")
+
+                remote_pth_to_subdir = remote_tmpdir.path / "some-dir" / "some-subdir"
+                self.shell.mkdir(remote_path=remote_pth_to_subdir)
+                self.shell.write_text(remote_path=remote_pth_to_subdir / "some-file", text="hello")
+
+                self.assertTrue(self.shell.exists(remote_path=remote_pth_to_dir))
+                self.assertTrue(self.shell.exists(remote_path=remote_pth_to_subdir))
+
+                self.shell.sync_to_remote(local_path=local_tmpdir.path, remote_path=remote_tmpdir.path, delete=delete)
+
+                self.assertFalse(self.shell.exists(remote_path=remote_pth_to_dir))
+                self.assertFalse(self.shell.exists(remote_path=remote_pth_to_subdir))
+
     def test_preserve_permissions(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
                 temppathlib.TemporaryDirectory() as local_tmpdir:

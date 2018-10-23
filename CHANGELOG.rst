@@ -1,3 +1,7 @@
+2.1.2
+=====
+* Replaced mutable argument types with immutable ones where appropriate
+
 2.1.1
 =====
 * Fixed ``sync_to_remote`` to delete children before parent directories

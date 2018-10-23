@@ -8,18 +8,17 @@ import pathlib
 import shutil
 import socket
 import stat as stat_module
-import subprocess
 import time
 import uuid
-from typing import Optional, Union, TextIO, List, Dict, Sequence, Set
+from typing import Optional, Union, TextIO, List, Dict, Sequence, Set, Mapping
 
+import icontract
 import paramiko
 import spur
 import spur.results
 import spur.ssh
 import temppathlib
 
-import icontract
 import spurplus.sftp
 
 # pylint: disable=protected-access
@@ -169,9 +168,9 @@ class SshShell(icontract.DBC):
         return self._sftp
 
     def run(self,
-            command: List[str],
+            command: Sequence[str],
             cwd: Union[str, pathlib.Path] = "",
-            update_env: Optional[Dict[str, str]] = None,
+            update_env: Optional[Mapping[str, str]] = None,
             allow_error: bool = False,
             stdout: Optional[TextIO] = None,
             stderr: Optional[TextIO] = None,
@@ -226,8 +225,8 @@ class SshShell(icontract.DBC):
             use_pty=use_pty).wait_for_result()
 
     def check_output(self,
-                     command: List[str],
-                     update_env: Optional[Dict[str, str]] = None,
+                     command: Sequence[str],
+                     update_env: Optional[Mapping[str, str]] = None,
                      cwd: str = "",
                      stderr: Optional[TextIO] = None,
                      encoding: str = 'utf-8',
@@ -244,8 +243,8 @@ class SshShell(icontract.DBC):
             command=command, update_env=update_env, cwd=cwd, stderr=stderr, encoding=encoding, use_pty=use_pty).output
 
     def spawn(self,
-              command: List[str],
-              update_env: Optional[Dict[str, str]] = None,
+              command: Sequence[str],
+              update_env: Optional[Mapping[str, str]] = None,
               store_pid: bool = False,
               cwd: Union[str, pathlib.Path] = "",
               stdout: Optional[TextIO] = None,
@@ -1173,7 +1172,7 @@ def connect_with_retries(hostname: str,
 
 @icontract.pre(lambda argc_max: argc_max > 0)
 @icontract.pre(lambda arg_max: arg_max > 0)
-def chunk_arguments(args: List[str], arg_max: int = 16 * 1024, argc_max=1024) -> List[List[str]]:
+def chunk_arguments(args: Sequence[str], arg_max: int = 16 * 1024, argc_max=1024) -> List[List[str]]:
     """
     Split a long list of command-line arguments into chunks.
 

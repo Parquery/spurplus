@@ -140,6 +140,24 @@ class TestConnectionFailure(unittest.TestCase):
             self.assertEqual(4, len(listdir))
             self.assertTrue(type(List[paramiko.sftp_attr.SFTPAttributes]))
 
+    def test_listdir(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
+            pth_to_dir1 = tmpdir.path / "some-dir1"
+            pth_to_dir2 = tmpdir.path / "some-dir2"
+            pth_to_dir3 = tmpdir.path / "some-dir3"
+            pth_to_file = tmpdir.path / "some-file"
+
+            self.shell.mkdir(remote_path=pth_to_dir1)
+            self.shell.mkdir(remote_path=pth_to_dir2)
+            self.shell.mkdir(remote_path=pth_to_dir3)
+            self.shell.write_text(remote_path=pth_to_file, text="hello")
+
+            self.reconnecting_sftp._sftp.sock.close()  # pylint: disable=protected-access
+            listdir = self.reconnecting_sftp.listdir(path=tmpdir.path.as_posix())
+
+            self.assertEqual(4, len(listdir))
+            self.assertListEqual(['some-dir1', 'some-dir2', 'some-dir3', 'some-file'], sorted(listdir))
+
     def test_posix_rename_file(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
             pth_to_file = tmpdir.path / "some-file"

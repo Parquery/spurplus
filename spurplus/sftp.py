@@ -6,6 +6,7 @@ import socket
 import time
 from typing import TypeVar, Callable, Optional, Union  # pylint: disable=unused-import
 
+import icontract
 import paramiko
 
 T = TypeVar('T')
@@ -95,6 +96,11 @@ class ReconnectingSFTP:
     def listdir_attr(self, path='.'):
         """See paramiko.SFTP documentation."""
         return self.__wrap(method=lambda sftp: sftp.listdir_attr(path))
+
+    @icontract.ensure(lambda result: all('/' not in name for name in result))
+    def listdir(self, path='.'):
+        """See paramiko.SFTP documentation."""
+        return self.__wrap(method=lambda sftp: sftp.listdir(path))
 
     def remove(self, path):
         """See paramiko.SFTP documentation."""

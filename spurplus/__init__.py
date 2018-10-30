@@ -967,7 +967,7 @@ class SshShell(icontract.DBC):
         """
         self._sftp.chown(path=str(remote_path), uid=uid, gid=gid)
 
-    @icontract.post(lambda result: result == result.strip(), enabled=icontract.SLOW)
+    @icontract.ensure(lambda result: result == result.strip(), enabled=icontract.SLOW)
     def whoami(self) -> str:
         """Execute the `whoami` command and return the user name."""
         return self.check_output(command=['whoami']).strip()
@@ -992,8 +992,8 @@ class SshShell(icontract.DBC):
 class TemporaryDirectory(metaclass=icontract.DBCMeta):
     """Represent a remote temporary directory."""
 
-    @icontract.pre(lambda prefix: prefix is None or '/' not in prefix)
-    @icontract.pre(lambda suffix: suffix is None or '/' not in suffix)
+    @icontract.require(lambda prefix: prefix is None or '/' not in prefix)
+    @icontract.require(lambda suffix: suffix is None or '/' not in suffix)
     def __init__(self,
                  shell: SshShell,
                  prefix: Optional[str] = None,
@@ -1040,7 +1040,7 @@ class TemporaryDirectory(metaclass=icontract.DBCMeta):
         self.shell.run(command=['rm', '-rf', self.path.as_posix()])
 
 
-@icontract.pre(lambda retries: retries >= 0)
+@icontract.require(lambda retries: retries >= 0)
 def connect_with_retries(hostname: str,
                          username: Optional[str] = None,
                          password: Optional[str] = None,
@@ -1170,8 +1170,8 @@ def connect_with_retries(hostname: str,
         raise ConnectionError("Failed to connect after {} retries to {}: {}".format(retries, hostname, last_err))
 
 
-@icontract.pre(lambda argc_max: argc_max > 0)
-@icontract.pre(lambda arg_max: arg_max > 0)
+@icontract.require(lambda argc_max: argc_max > 0)
+@icontract.require(lambda arg_max: arg_max > 0)
 def chunk_arguments(args: Sequence[str], arg_max: int = 16 * 1024, argc_max=1024) -> List[List[str]]:
     """
     Split a long list of command-line arguments into chunks.

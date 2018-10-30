@@ -1,3 +1,8 @@
+2.2.0
+=====
+* Updated to icontract 2.0.1
+* Added ``listdir`` to ``spurplus.sftp``
+
 2.1.2
 =====
 * Replaced mutable argument types with immutable ones where appropriate

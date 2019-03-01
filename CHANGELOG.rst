@@ -1,3 +1,7 @@
+2.2.1
+=====
+* Added ``temppathlib`` to dependencies (was in dev dependencies before)
+
 2.2.0
 =====
 * Updated to icontract 2.0.1

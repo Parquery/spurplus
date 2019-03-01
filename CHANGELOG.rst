@@ -1,3 +1,7 @@
+2.3.0
+=====
+* Added initialization of reconnecting SFTP through paramiko
+
 2.2.1
 =====
 * Added ``temppathlib`` to dependencies (was in dev dependencies before)

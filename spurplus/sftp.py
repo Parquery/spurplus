@@ -8,6 +8,7 @@ from typing import TypeVar, Callable, Optional, Union  # pylint: disable=unused-
 
 import icontract
 import paramiko
+import spur
 
 T = TypeVar('T')
 
@@ -253,3 +254,111 @@ def _mkdir(sftp: Union[paramiko.SFTP, ReconnectingSFTP],
                     raise PermissionError(msg)
                 else:
                     raise OSError(msg)
+
+
+def reconnecting_sftp(hostname: str,
+                      username: Optional[str] = None,
+                      password: Optional[str] = None,
+                      port: Optional[int] = None,
+                      private_key_file: Optional[Union[str, pathlib.Path]] = None,
+                      connect_timeout: Optional[int] = None,
+                      missing_host_key: Optional[spur.ssh.MissingHostKey] = None,
+                      look_for_private_keys: Optional[bool] = True,
+                      load_system_host_keys: Optional[bool] = True,
+                      sock: Optional[socket.socket] = None,
+                      max_retries: int = 10,
+                      retry_period: float = 0.1) -> ReconnectingSFTP:
+    """
+    Try to connect to the instance and retry on failure.
+
+    Reconnect `retries` number of times and wait for `retry_period` seconds between the retries.
+
+    For all the arguments except `retries` and `retry_period`, the documentation was copy/pasted from
+    https://github.com/mwilliamson/spur.py/blob/0.3.20/README.rst:
+
+    You need to specify some combination of a username, password and private key to authenticate.
+
+    :param hostname: of the instance to connect
+    :param username: for authentication
+    :param password: for authentication
+    :param port: for connection, default is 22
+    :param private_key_file: path to the private key file
+    :param connect_timeout: a timeout in seconds for establishing an SSH connection. Defaults to 60 (one minute).
+    :param missing_host_key:
+        by default, an error is raised when a host key is missing.
+
+        One of the following values can be used to change the behaviour when a host key is missing:
+        * spur.ssh.MissingHostKey.raise_error -- raise an error
+        * spur.ssh.MissingHostKey.warn -- accept the host key and log a warning
+        * spur.ssh.MissingHostKey.accept -- accept the host key
+
+    :param look_for_private_keys:
+        by default, Spur will search for discoverable private key files in ~/.ssh/.
+        Set to False to disable this behaviour.
+
+    :param load_system_host_keys:
+        by default, Spur will attempt to read host keys from the user's known hosts file,
+        as used by OpenSSH, and no exception will be raised if the file can't be read.
+        Set to False to disable this behaviour.
+
+    :param sock: an open socket or socket-like object to use for communication to the target host.
+
+    :param max_retries: maximum number of retries before raising ConnectionError
+    :param retry_period: how long to wait between two retries; in seconds
+
+    :return: established reconnecting SFTP connection
+    """
+    # pylint: disable=too-many-arguments
+    private_key_file_str = None  # type: Optional[str]
+
+    if private_key_file is not None:
+        private_key_file_str = (private_key_file if isinstance(private_key_file, str) else private_key_file.as_posix())
+
+    if port is None:
+        port = 22
+
+    if missing_host_key is None:
+        missing_host_key = spur.ssh.MissingHostKey.raise_error
+
+    def open_sftp() -> paramiko.SFTP:
+        """Connect to the SFTP server."""
+        client = paramiko.SSHClient()
+        if load_system_host_keys:
+            client.load_system_host_keys()
+        client.set_missing_host_key_policy(policy=missing_host_key)
+
+        assert port is not None
+        client.connect(
+            hostname=hostname,
+            port=port,
+            username=username,
+            password=password,
+            key_filename=private_key_file_str,
+            look_for_keys=look_for_private_keys,
+            timeout=connect_timeout,
+            sock=sock)
+
+        sftp = None  # type: Optional[paramiko.SFTP]
+        try:
+            sftp = client.open_sftp()
+        except Exception as err:
+            client.close()
+            raise err
+
+        assert sftp is not None
+
+        old_sftp_close = sftp.close
+
+        # Hack the close to close the underlying client as well.
+        def close() -> None:
+            """Close the SFTP connection and the underlying client as well."""
+            try:
+                old_sftp_close()
+            finally:
+                client.close()
+
+        sftp.close = close
+
+        return sftp
+
+    return ReconnectingSFTP(sftp_opener=open_sftp, max_retries=max_retries, retry_period=retry_period)

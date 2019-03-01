@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
-# pylint: disable=missing-docstring
-
+# pylint: disable=missing-docstring,no-self-use
+import contextlib
 import pathlib
 import unittest
 from typing import List  # pylint: disable=unused-import
 
 import paramiko
 import temppathlib
+import spur.ssh
 
 import spurplus
 import spurplus.sftp
@@ -32,7 +33,7 @@ class TestConnectionFailure(unittest.TestCase):
     def tearDown(self):
         self.shell.close()
 
-    def test_files_differ(self):
+    def test_files_differ(self) -> None:
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
                 temppathlib.TemporaryDirectory() as local_tmpdir:
             local_dir = local_tmpdir.path / "some-dir"
@@ -54,10 +55,9 @@ class TestConnectionFailure(unittest.TestCase):
             self.assertTrue(self.shell.exists(remote_path=remote_pth_to_file))
             self.assertEqual("hello", self.shell.read_text(remote_path=remote_pth_to_file))
 
-    def test_remove(self):
+    def test_remove(self) -> None:
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
                 temppathlib.TemporaryDirectory() as local_tmpdir:
-
             remote_only_dir = remote_tmpdir.path / "remote-only-dir"
 
             self.shell.mkdir(remote_path=remote_only_dir)
@@ -77,10 +77,9 @@ class TestConnectionFailure(unittest.TestCase):
 
             self.assertListEqual([], dir_diff.remote_only_directories)
 
-    def test_put(self):
+    def test_put(self) -> None:
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
                 temppathlib.TemporaryDirectory() as local_tmpdir:
-
             local_pth = local_tmpdir.path / 'file.txt'
             local_pth.write_text("hello")
 
@@ -100,10 +99,9 @@ class TestConnectionFailure(unittest.TestCase):
 
             self.assertListEqual([pathlib.Path('file.txt')], dir_diff.identical_files)
 
-    def test_get(self):
+    def test_get(self) -> None:
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
                 temppathlib.TemporaryDirectory() as local_tmpdir:
-
             local_pth = local_tmpdir.path / 'file.txt'
 
             remote_pth = remote_tmpdir.path / 'file.txt'
@@ -122,7 +120,7 @@ class TestConnectionFailure(unittest.TestCase):
 
             self.assertListEqual([pathlib.Path('file.txt')], dir_diff.identical_files)
 
-    def test_listdir_attr(self):
+    def test_listdir_attr(self) -> None:
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
             pth_to_dir1 = tmpdir.path / "some-dir1"
             pth_to_dir2 = tmpdir.path / "some-dir2"
@@ -140,7 +138,7 @@ class TestConnectionFailure(unittest.TestCase):
             self.assertEqual(4, len(listdir))
             self.assertTrue(type(List[paramiko.sftp_attr.SFTPAttributes]))
 
-    def test_listdir(self):
+    def test_listdir(self) -> None:
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
             pth_to_dir1 = tmpdir.path / "some-dir1"
             pth_to_dir2 = tmpdir.path / "some-dir2"
@@ -158,7 +156,7 @@ class TestConnectionFailure(unittest.TestCase):
             self.assertEqual(4, len(listdir))
             self.assertListEqual(['some-dir1', 'some-dir2', 'some-dir3', 'some-file'], sorted(listdir))
 
-    def test_posix_rename_file(self):
+    def test_posix_rename_file(self) -> None:
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
             pth_to_file = tmpdir.path / "some-file"
             new_pth_to_file = tmpdir.path / "renamed-file"
@@ -173,7 +171,7 @@ class TestConnectionFailure(unittest.TestCase):
             self.assertFalse(self.shell.exists(remote_path=pth_to_file))
             self.assertTrue(self.shell.exists(remote_path=new_pth_to_file))
 
-    def test_mkdir(self):
+    def test_mkdir(self) -> None:
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
             pth_to_folder = tmpdir.path / "some-folder"
 
@@ -184,7 +182,7 @@ class TestConnectionFailure(unittest.TestCase):
 
             self.assertTrue(self.shell.exists(remote_path=pth_to_folder))
 
-    def test_rmdir(self):
+    def test_rmdir(self) -> None:
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
             pth_to_folder = tmpdir.path / "some-folder"
             self.reconnecting_sftp.mkdir(path=pth_to_folder.as_posix())
@@ -195,6 +193,56 @@ class TestConnectionFailure(unittest.TestCase):
             self.reconnecting_sftp.rmdir(path=pth_to_folder.as_posix())
 
             self.assertFalse(self.shell.exists(remote_path=pth_to_folder))
+
+
+class TestReconnectingSFTP(unittest.TestCase):
+    def test_that_it_closes(self) -> None:
+        params = tests.common.params_from_environ()
+
+        sftp = spurplus.sftp.reconnecting_sftp(
+            hostname=params.hostname,
+            port=params.port,
+            username=params.username,
+            password=params.password,
+            private_key_file=params.private_key_file,
+            missing_host_key=spur.ssh.MissingHostKey.accept)
+
+        # pylint: disable=protected-access
+
+        with contextlib.ExitStack() as exit_stack:
+            exit_stack.push(sftp)
+            lst = sftp.listdir('.')
+            assert lst is not None
+            assert isinstance(lst, list)
+            self.assertIsNotNone(sftp._sftp)
+
+        self.assertIsNone(sftp._sftp)
+
+    def test_that_it_reconnects(self) -> None:
+        params = tests.common.params_from_environ()
+
+        with spurplus.sftp.reconnecting_sftp(
+                hostname=params.hostname,
+                port=params.port,
+                username=params.username,
+                password=params.password,
+                private_key_file=params.private_key_file,
+                missing_host_key=spur.ssh.MissingHostKey.accept) as sftp:
+            lst = sftp.listdir('.')
+            assert lst is not None
+            assert isinstance(lst, list)
+
+            # pylint: disable=protected-access
+
+            # Simulate a disconnection
+            assert sftp._sftp is not None, \
+                "Expected underlying paramiko sftp to be initialized after the first command of reconnecting SFTP."
+
+            sftp._sftp.sock.close()
+
+            lst = sftp.listdir('.')
+            assert lst is not None
+            assert isinstance(lst, list)
 
 
 if __name__ == '__main__':

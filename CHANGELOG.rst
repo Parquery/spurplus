@@ -1,3 +1,7 @@
+2.3.1
+=====
+* Set the default of ``cwd`` argument to ``None`` instead of ``""``
+
 2.3.0
 =====
 * Added initialization of reconnecting SFTP through paramiko

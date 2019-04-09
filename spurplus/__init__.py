@@ -169,7 +169,7 @@ class SshShell(icontract.DBC):
 
     def run(self,
             command: Sequence[str],
-            cwd: Union[str, pathlib.Path] = "",
+            cwd: Optional[Union[str, pathlib.Path]] = None,
             update_env: Optional[Mapping[str, str]] = None,
             allow_error: bool = False,
             stdout: Optional[TextIO] = None,
@@ -216,7 +216,7 @@ class SshShell(icontract.DBC):
 
         return self.spawn(
             command=command,
-            cwd=cwd if isinstance(cwd, str) else cwd.as_posix(),
+            cwd=cwd,
             update_env=update_env,
             allow_error=allow_error,
             stdout=stdout,
@@ -227,7 +227,7 @@ class SshShell(icontract.DBC):
     def check_output(self,
                      command: Sequence[str],
                      update_env: Optional[Mapping[str, str]] = None,
-                     cwd: str = "",
+                     cwd: Optional[Union[str, pathlib.Path]] = None,
                      stderr: Optional[TextIO] = None,
                      encoding: str = 'utf-8',
                      use_pty: bool = False) -> str:
@@ -246,7 +246,7 @@ class SshShell(icontract.DBC):
               command: Sequence[str],
               update_env: Optional[Mapping[str, str]] = None,
               store_pid: bool = False,
-              cwd: Union[str, pathlib.Path] = "",
+              cwd: Optional[Union[str, pathlib.Path]] = None,
               stdout: Optional[TextIO] = None,
               stderr: Optional[TextIO] = None,
               encoding: str = 'utf-8',
@@ -295,9 +295,18 @@ class SshShell(icontract.DBC):
 
         update_env_dict = {} if update_env is None else update_env
 
+        if cwd is None:
+            resolved_cwd = None
+        elif isinstance(cwd, str):
+            resolved_cwd = cwd
+        elif isinstance(cwd, pathlib.Path):
+            resolved_cwd = cwd.as_posix()
+        else:
+            raise NotImplementedError("Unhandled type of cwd: {}".format(type(cwd)))
+
         return self._spur.spawn(
             command=command,
-            cwd=cwd if isinstance(cwd, str) else cwd.as_posix(),
+            cwd=resolved_cwd,
             update_env=update_env_dict,
             store_pid=store_pid,
             allow_error=allow_error,

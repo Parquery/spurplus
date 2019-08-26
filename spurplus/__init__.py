@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Manage remote machines and perform file operations over SSH."""
-
+import contextlib
 import enum
 import hashlib
 import os
@@ -10,7 +10,8 @@ import socket
 import stat as stat_module
 import time
 import uuid
-from typing import Optional, Union, TextIO, List, Dict, Sequence, Set, Mapping
+from typing import Optional, Union, TextIO, List, Dict, Sequence, Set, Mapping, \
+    Iterator
 
 import icontract
 import paramiko
@@ -106,6 +107,29 @@ class DirectoryDiff:
         self.local_only_directories = []  # type: List[pathlib.Path]
         self.common_directories = []  # type: List[pathlib.Path]
         self.remote_only_directories = []  # type: List[pathlib.Path]
+
+
+@contextlib.contextmanager
+def _temporary_file_deleted_after_cm_exit() -> Iterator[temppathlib.NamedTemporaryFile]:
+    """
+    Generate a temporary file that is deleted only on context exit.
+
+    The file is **not** deleted when you invoke close() on it.
+
+    This context manager is necessary for Windows compatibility. Please see
+    https://bugs.python.org/issue14243 for more details.
+
+    :return: context manager around a temporary file
+    """
+    fid = temppathlib.NamedTemporaryFile(delete=False)
+
+    # Close the file so that it can be reused in different function calls
+    fid.close()
+
+    try:
+        yield fid
+    finally:
+        os.unlink(str(fid.path))
 
 
 class SshShell(icontract.DBC):
@@ -477,10 +501,11 @@ class SshShell(icontract.DBC):
 
         if create_directories:
             spurplus.sftp._mkdir(sftp=self._sftp, remote_path=rmt_pth.parent, mode=0o777, parents=True, exist_ok=True)
-        with temppathlib.NamedTemporaryFile() as tmp:
+
+        with _temporary_file_deleted_after_cm_exit() as tmp:
             tmp.path.write_bytes(data)
             self.put(
-                local_path=tmp.path.as_posix(),
+                local_path=str(tmp.path),
                 remote_path=rmt_pth.as_posix(),
                 consistent=consistent,
                 create_directories=create_directories)
@@ -754,10 +779,10 @@ class SshShell(icontract.DBC):
         if consistent:
             with temppathlib.TemporaryDirectory() as local_tmpdir:
                 tmp_pth = local_tmpdir.path / str(uuid.uuid4())
-                self._sftp.get(remotepath=rmt_pth_str, localpath=tmp_pth.as_posix())
-                shutil.move(src=tmp_pth.as_posix(), dst=loc_pth.as_posix())
+                self._sftp.get(remotepath=rmt_pth_str, localpath=str(tmp_pth))
+                shutil.move(src=str(tmp_pth), dst=str(loc_pth))
         else:
-            self._sftp.get(remotepath=rmt_pth_str, localpath=loc_pth.as_posix())
+            self._sftp.get(remotepath=rmt_pth_str, localpath=str(loc_pth))
 
     def read_bytes(self, remote_path: Union[str, pathlib.Path]) -> bytes:
         """
@@ -774,8 +799,8 @@ class SshShell(icontract.DBC):
         permerr = None  # type: Optional[PermissionError]
         notfounderr = None  # type: Optional[FileNotFoundError]
         try:
-            with temppathlib.NamedTemporaryFile() as tmp:
-                self.get(remote_path=rmt_pth_str, local_path=tmp.path.as_posix(), consistent=True)
+            with _temporary_file_deleted_after_cm_exit() as tmp:
+                self.get(remote_path=rmt_pth_str, local_path=str(tmp.path), consistent=True)
                 return tmp.path.read_bytes()
         except PermissionError as err:
             permerr = err
@@ -1123,7 +1148,7 @@ def connect_with_retries(hostname: str,
         if isinstance(private_key_file, str):
             private_key_file_str = private_key_file
         else:
-            private_key_file_str = private_key_file.as_posix()
+            private_key_file_str = str(private_key_file)
 
     ssh_retries_left = retries
 

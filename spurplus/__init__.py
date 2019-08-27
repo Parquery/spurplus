@@ -777,10 +777,21 @@ class SshShell(icontract.DBC):
             loc_pth.parent.mkdir(mode=0o777, exist_ok=True, parents=True)
 
         if consistent:
-            with temppathlib.TemporaryDirectory() as local_tmpdir:
-                tmp_pth = local_tmpdir.path / str(uuid.uuid4())
-                self._sftp.get(remotepath=rmt_pth_str, localpath=str(tmp_pth))
-                shutil.move(src=str(tmp_pth), dst=str(loc_pth))
+            tmp = None  # type: Optional[temppathlib.NamedTemporaryFile]
+            try:
+                tmp = temppathlib.NamedTemporaryFile(delete=False)
+
+                # Close the file so that it can be reused, see
+                # https://bugs.python.org/issue14243 for more details.
+                tmp.close()
+
+                self._sftp.get(remotepath=rmt_pth_str, localpath=str(tmp.path))
+                shutil.move(src=str(tmp.path), dst=str(loc_pth))
+                tmp = None
+
+            finally:
+                if tmp is not None:
+                    os.unlink(str(tmp.path))
         else:
             self._sftp.get(remotepath=rmt_pth_str, localpath=str(loc_pth))
 
@@ -800,7 +811,7 @@ class SshShell(icontract.DBC):
         notfounderr = None  # type: Optional[FileNotFoundError]
         try:
             with _temporary_file_deleted_after_cm_exit() as tmp:
-                self.get(remote_path=rmt_pth_str, local_path=str(tmp.path), consistent=True)
+                self.get(remote_path=rmt_pth_str, local_path=str(tmp.path), consistent=False)
                 return tmp.path.read_bytes()
         except PermissionError as err:
             permerr = err

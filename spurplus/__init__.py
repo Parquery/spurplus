@@ -129,7 +129,10 @@ def _temporary_file_deleted_after_cm_exit() -> Iterator[temppathlib.NamedTempora
     try:
         yield fid
     finally:
-        os.unlink(str(fid.path))
+        try:
+            fid.path.unlink()
+        except FileNotFoundError:
+            pass
 
 
 class SshShell(icontract.DBC):
@@ -777,21 +780,9 @@ class SshShell(icontract.DBC):
             loc_pth.parent.mkdir(mode=0o777, exist_ok=True, parents=True)
 
         if consistent:
-            tmp = None  # type: Optional[temppathlib.NamedTemporaryFile]
-            try:
-                tmp = temppathlib.NamedTemporaryFile(delete=False)
-
-                # Close the file so that it can be reused, see
-                # https://bugs.python.org/issue14243 for more details.
-                tmp.close()
-
+            with _temporary_file_deleted_after_cm_exit() as tmp:
                 self._sftp.get(remotepath=rmt_pth_str, localpath=str(tmp.path))
                 shutil.move(src=str(tmp.path), dst=str(loc_pth))
-                tmp = None
-
-            finally:
-                if tmp is not None:
-                    os.unlink(str(tmp.path))
         else:
             self._sftp.get(remotepath=rmt_pth_str, localpath=str(loc_pth))
 

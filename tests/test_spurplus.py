@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # pylint: disable=missing-docstring
-
+import pathlib  # pylint: disable=unused-import
 import unittest
 from typing import Optional  # pylint: disable=unused-import
 
@@ -40,6 +40,17 @@ class TestChunkArguments(unittest.TestCase):
     def test_chunk_with_multiple_args(self):
         self.assertListEqual([['some-arg', 'other-arg'], ['yet-another-arg']],
                              spurplus.chunk_arguments(args=['some-arg', 'other-arg', 'yet-another-arg'], arg_max=20))
+
+
+class TestTemporaryFileContextManager(unittest.TestCase):
+    def test_that_it_works(self) -> None:
+        pth = None  # type: Optional[pathlib.Path]
+        with spurplus._temporary_file_deleted_after_cm_exit() as tmp:  # pylint: disable=protected-access
+            pth = tmp.path
+            self.assertTrue(pth.exists())
+
+        assert pth is not None, "Expected pth to be set in the context"
+        self.assertFalse(pth.exists())
 
 
 if __name__ == '__main__':

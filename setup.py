@@ -17,7 +17,7 @@ with open(os.path.join(here, 'README.rst'), encoding='utf-8') as fid:
 
 setup(
     name='spurplus',
-    version='2.3.1',
+    version='2.3.2',
     description='Manage remote machines and file operations over SSH.',
     long_description=long_description,
     url='http://github.com/Parquery/spurplus',

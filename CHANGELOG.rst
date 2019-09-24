@@ -1,3 +1,8 @@
+2.3.2
+=====
+* Added separate named temporary files for Windows compatibility
+
+
 2.3.1
 =====
 * Set the default of ``cwd`` argument to ``None`` instead of ``""``

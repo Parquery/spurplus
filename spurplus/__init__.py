@@ -3,6 +3,7 @@
 import contextlib
 import enum
 import hashlib
+import posixpath
 import os
 import pathlib
 import shutil
@@ -133,6 +134,23 @@ def _temporary_file_deleted_after_cm_exit() -> Iterator[temppathlib.NamedTempora
             fid.path.unlink()
         except FileNotFoundError:
             pass
+
+
+def _path_to_posix_str(path: Union[str, pathlib.Path]) -> str:
+    """
+    Convert the path to a string representation in POSIX.
+
+    :param path: to be converted
+    :return: string representing the path in POSIX
+    """
+    if isinstance(path, str):
+        result = path
+    elif isinstance(path, pathlib.Path):
+        result = path.as_posix()
+    else:
+        raise TypeError("Unexpected type of path {}: {}".format(path, type(path)))
+
+    return result
 
 
 class SshShell(icontract.DBC):
@@ -349,8 +367,10 @@ class SshShell(icontract.DBC):
         :param remote_path: to the file
         :return: MD5 sum
         """
-        out = self.run(command=['md5sum', str(remote_path)]).output
-        remote_hsh, _ = out.strip().split(None, 1)
+        rmt_pth_str = _path_to_posix_str(path=remote_path)
+
+        out = self.run(command=['md5sum', rmt_pth_str]).output
+        remote_hsh, _ = out.strip().split()
 
         return remote_hsh
 
@@ -363,14 +383,16 @@ class SshShell(icontract.DBC):
         :param remote_paths: to the files
         :return: MD5 sum for each remote file separately; if a file does not exist, its checksum is set to None.
         """
-        pth_to_index = dict(((str(pth), i) for i, pth in enumerate(remote_paths)))
+        rmt_pth_strs = [_path_to_posix_str(remote_path) for remote_path in remote_paths]  # type: List[str]
 
-        existing_pths = [str(pth) for pth in remote_paths if self.exists(remote_path=pth)]
+        pth_to_index = dict(((pth, i) for i, pth in enumerate(rmt_pth_strs)))
+
+        existing_pths = [pth for pth in rmt_pth_strs if self.exists(remote_path=pth)]
 
         # chunk in order not to overflow the maximum argument length and count
         chunks = chunk_arguments(args=existing_pths)
 
-        result = [None] * len(remote_paths)  # type: List[Optional[str]]
+        result = [None] * len(rmt_pth_strs)  # type: List[Optional[str]]
 
         for chunk in chunks:
             lines = self.check_output(command=['md5sum'] + chunk).splitlines()
@@ -862,22 +884,24 @@ class SshShell(icontract.DBC):
             if set, removes the directory recursively. This parameter has no effect if remote_path is not a directory.
         :return:
         """
-        a_stat = self.stat(remote_path=remote_path)
+        rmt_pth_str = _path_to_posix_str(path=remote_path)
+
+        a_stat = self.stat(remote_path=rmt_pth_str)
         if a_stat is None:
-            raise FileNotFoundError("Remote file does not exist and thus can not be removed: {}".format(remote_path))
+            raise FileNotFoundError("Remote file does not exist and thus can not be removed: {}".format(rmt_pth_str))
 
         if not stat_module.S_ISDIR(a_stat.st_mode):
-            self._sftp.remove(str(remote_path))
+            self._sftp.remove(rmt_pth_str)
             return
 
         if not recursive:
-            attrs = self._sftp.listdir_attr(str(remote_path))
+            attrs = self._sftp.listdir_attr(rmt_pth_str)
 
             if len(attrs) > 0:
                 raise OSError(
-                    "The remote directory is not empty and the recursive flag was not set: {}".format(remote_path))
+                    "The remote directory is not empty and the recursive flag was not set: {}".format(rmt_pth_str))
 
-            self._sftp.rmdir(str(remote_path))
+            self._sftp.rmdir(rmt_pth_str)
             return
 
         # Remove all files in the first step, then remove all the directories in a second step
@@ -885,14 +909,14 @@ class SshShell(icontract.DBC):
         stack2 = []  # type: List[str]
 
         # First step: remove all files
-        stack1.append(str(remote_path))
+        stack1.append(rmt_pth_str)
 
         while stack1:
             pth = stack1.pop()
             stack2.append(pth)
 
             for attr in self._sftp.listdir_attr(pth):
-                subpth = os.path.join(pth, attr.filename)
+                subpth = posixpath.join(pth, attr.filename)
 
                 if stat_module.S_ISDIR(attr.st_mode):
                     stack1.append(subpth)
@@ -901,7 +925,7 @@ class SshShell(icontract.DBC):
                         self._sftp.remove(path=subpth)
                     except OSError as err:
                         raise OSError("Failed to remove the remote file while recursively removing {}: {}".format(
-                            remote_path, subpth)) from err
+                            rmt_pth_str, subpth)) from err
 
         # Second step: remove all directories
         while stack2:
@@ -911,7 +935,7 @@ class SshShell(icontract.DBC):
                 self._sftp.rmdir(path=pth)
             except OSError as err:
                 raise OSError("Failed to remove the remote directory while recursively removing {}: {}".format(
-                    remote_path, pth)) from err
+                    rmt_pth_str, pth)) from err
 
     def chmod(self, remote_path: Union[str, pathlib.Path], mode: int) -> None:
         """
@@ -921,10 +945,12 @@ class SshShell(icontract.DBC):
         :param mode: permission mode
         :return:
         """
+        rmt_pth_str = _path_to_posix_str(path=remote_path)
+
         try:
-            self._sftp.chmod(path=str(remote_path), mode=mode)
+            self._sftp.chmod(path=rmt_pth_str, mode=mode)
         except FileNotFoundError as err:
-            raise FileNotFoundError("Remote file to be chmod'ed does not exist: {}".format(remote_path)) from err
+            raise FileNotFoundError("Remote file to be chmod'ed does not exist: {}".format(rmt_pth_str)) from err
 
     def stat(self, remote_path: Union[str, pathlib.Path]) -> Optional[paramiko.SFTPAttributes]:
         """
@@ -934,8 +960,11 @@ class SshShell(icontract.DBC):
         :return: stats of the file; None if the file does not exist
         """
         result = None  # type: Optional[paramiko.SFTPAttributes]
+
+        rmt_pth_str = _path_to_posix_str(path=remote_path)
+
         try:
-            result = self._sftp.stat(path=str(remote_path))
+            result = self._sftp.stat(path=rmt_pth_str)
         except FileNotFoundError:
             pass
 
@@ -949,9 +978,11 @@ class SshShell(icontract.DBC):
         :return: True if the remote path is a directory
         :raise: FileNotFound if the remote path does not exist
         """
-        a_stat = self.stat(remote_path=remote_path)
+        rmt_pth_str = _path_to_posix_str(path=remote_path)
+
+        a_stat = self.stat(remote_path=rmt_pth_str)
         if a_stat is None:
-            raise FileNotFoundError("Remote file does not exist: {}".format(remote_path))
+            raise FileNotFoundError("Remote file does not exist: {}".format(rmt_pth_str))
 
         return stat_module.S_ISDIR(a_stat.st_mode)
 
@@ -963,12 +994,14 @@ class SshShell(icontract.DBC):
         :return: True if the remote path is a directory
         :raise: FileNotFound if the remote path does not exist
         """
+        rmt_pth_str = _path_to_posix_str(path=remote_path)
+
         try:
-            a_lstat = self._sftp.lstat(path=str(remote_path))
+            a_lstat = self._sftp.lstat(path=rmt_pth_str)
             return stat_module.S_ISLNK(a_lstat.st_mode)
 
         except FileNotFoundError as err:
-            raise FileNotFoundError("Remote file does not exist: {}".format(remote_path)) from err
+            raise FileNotFoundError("Remote file does not exist: {}".format(rmt_pth_str)) from err
 
     def symlink(self, source: Union[str, pathlib.Path], destination: Union[str, pathlib.Path]) -> None:
         """
@@ -978,16 +1011,19 @@ class SshShell(icontract.DBC):
         :param destination: remote path where to store the symbolic link
         :return:
         """
+        src = _path_to_posix_str(path=source)
+        dst = _path_to_posix_str(path=destination)
+
         try:
-            self._sftp.lstat(str(destination))
-            raise FileExistsError("The destination of the symbolic link already exists: {}".format(destination))
+            self._sftp.lstat(dst)
+            raise FileExistsError("The destination of the symbolic link already exists: {}".format(dst))
         except FileNotFoundError:
             pass
 
         try:
-            self._sftp.symlink(source=str(source), dest=str(destination))
+            self._sftp.symlink(source=src, dest=dst)
         except OSError as err:
-            raise OSError("Failed to create the symbolic link to {} at {}".format(source, destination)) from err
+            raise OSError("Failed to create the symbolic link to {} at {}".format(src, dst)) from err
 
     def chown(self, remote_path: Union[str, pathlib.Path], uid: int, gid: int) -> None:
         """
@@ -1001,7 +1037,8 @@ class SshShell(icontract.DBC):
         :param gid: ID of the group that owns the file
         :return:
         """
-        self._sftp.chown(path=str(remote_path), uid=uid, gid=gid)
+        rmt_pth_str = _path_to_posix_str(path=remote_path)
+        self._sftp.chown(path=rmt_pth_str, uid=uid, gid=gid)
 
     @icontract.ensure(lambda result: result == result.strip(), enabled=icontract.SLOW)
     def whoami(self) -> str:

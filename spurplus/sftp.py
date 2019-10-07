@@ -200,7 +200,7 @@ def _mkdir(sftp: Union[paramiko.SFTP, ReconnectingSFTP],
     if isinstance(remote_path, str):
         rmt_pth = pathlib.Path(os.path.normpath(remote_path))
     elif isinstance(remote_path, pathlib.Path):
-        rmt_pth = pathlib.Path(os.path.normpath(str(remote_path)))
+        rmt_pth = pathlib.Path(os.path.normpath(remote_path.as_posix()))
     else:
         raise NotImplementedError("Unhandled type of remote path: {}".format(type(remote_path)))
 
@@ -312,7 +312,7 @@ def reconnecting_sftp(hostname: str,
     private_key_file_str = None  # type: Optional[str]
 
     if private_key_file is not None:
-        private_key_file_str = (private_key_file if isinstance(private_key_file, str) else private_key_file.as_posix())
+        private_key_file_str = (private_key_file if isinstance(private_key_file, str) else str(private_key_file))
 
     if port is None:
         port = 22

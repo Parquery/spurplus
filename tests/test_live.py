@@ -241,7 +241,7 @@ class TestBasicIO(unittest.TestCase):
             except FileNotFoundError as err:
                 notfounderr = err
 
-            self.assertEqual("The remote path was not found: {}".format(pth), str(notfounderr))
+            self.assertEqual("The remote path was not found: {}".format(pth.as_posix()), str(notfounderr))
 
     def test_write_read_text(self):
         for consistent in [True, False]:
@@ -370,7 +370,7 @@ class TestFileOps(unittest.TestCase):
                 os_err = err
 
             self.assertIsNotNone(os_err)
-            self.assertEqual("Remote file does not exist: {}".format(pth_to_nonexisting), str(os_err))
+            self.assertEqual("Remote file does not exist: {}".format(pth_to_nonexisting.as_posix()), str(os_err))
 
     def test_is_symlink(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
@@ -401,7 +401,7 @@ class TestFileOps(unittest.TestCase):
             except FileNotFoundError as err:
                 notfounderr = err
 
-            self.assertEqual("Remote file does not exist: {}".format(pth_to_nonexisting), str(notfounderr))
+            self.assertEqual("Remote file does not exist: {}".format(pth_to_nonexisting.as_posix()), str(notfounderr))
 
     def test_symlink(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
@@ -435,8 +435,8 @@ class TestFileOps(unittest.TestCase):
                 file_exists_err = err
 
             self.assertIsNotNone(file_exists_err)
-            self.assertEqual("The destination of the symbolic link already exists: {}".format(pth_to_file_link),
-                             str(file_exists_err))
+            self.assertEqual("The destination of the symbolic link already exists: {}".format(
+                pth_to_file_link.as_posix()), str(file_exists_err))
 
     def test_symlink_with_nonexisting(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
@@ -483,8 +483,8 @@ class TestRemove(unittest.TestCase):
                 except FileNotFoundError as err:
                     notfounderr = err
 
-                self.assertEqual("Remote file does not exist and thus can not be removed: {}".format(pth_to_file),
-                                 str(notfounderr))
+                self.assertEqual("Remote file does not exist and thus can not be removed: {}".format(
+                    pth_to_file.as_posix()), str(notfounderr))
 
                 self.shell.write_text(remote_path=pth_to_file, text="hello")
 
@@ -540,9 +540,8 @@ class TestRemove(unittest.TestCase):
                 os_err = err
 
             self.assertIsNotNone(os_err)
-            self.assertEqual(
-                "The remote directory is not empty and the recursive flag was not set: {}".format(pth_to_some_dir),
-                str(os_err))
+            self.assertEqual("The remote directory is not empty and the recursive flag was not set: {}".format(
+                pth_to_some_dir.as_posix()), str(os_err))
 
     def test_recursive(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
@@ -608,7 +607,7 @@ class TestMirrorPermissions(unittest.TestCase):
 
             self.assertIsNotNone(not_found_err)
             self.assertEqual("Remote file to be chmod'ed does not exist: {}".format(
-                remote_tmpdir.path / "some-dir/some-file"), str(not_found_err))
+                (remote_tmpdir.path / "some-dir/some-file").as_posix()), str(not_found_err))
 
     def test_local_dir_permission_invalid_pth(self):  # pylint: disable=invalid-name
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \

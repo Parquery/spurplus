@@ -370,7 +370,7 @@ class SshShell(icontract.DBC):
         rmt_pth_str = _path_to_posix_str(path=remote_path)
 
         out = self.run(command=['md5sum', rmt_pth_str]).output
-        remote_hsh, _ = out.strip().split()
+        remote_hsh, _ = out.strip().split(None, 1)
 
         return remote_hsh
 
@@ -398,7 +398,7 @@ class SshShell(icontract.DBC):
             lines = self.check_output(command=['md5sum'] + chunk).splitlines()
             for line in lines:
                 if len(line) > 0:
-                    remote_hsh, pth = line.strip().split()
+                    remote_hsh, pth = line.strip().split(None, 1)
                     index = pth_to_index[pth]
                     result[index] = remote_hsh
 

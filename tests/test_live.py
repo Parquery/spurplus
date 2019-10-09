@@ -271,6 +271,17 @@ class TestMD5(unittest.TestCase):
             expected = hashlib.md5("hello".encode()).hexdigest()
             self.assertEqual(expected, md5digest)
 
+    def test_md5_with_space(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
+            pth = tmpdir.path / "oi hoi"
+
+            self.shell.write_text(remote_path=pth, text="hello")
+
+            md5digest = self.shell.md5(remote_path=pth)
+
+            expected = hashlib.md5("hello".encode()).hexdigest()
+            self.assertEqual(expected, md5digest)
+
     def test_md5s(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as tmpdir:
             expected = []  # type: List[Optional[str]]
@@ -832,6 +843,25 @@ class TestSpurplusSyncToRemote(unittest.TestCase):
 
             remote_dir = remote_tmpdir.path / "some-dir"
             remote_pth_to_file = remote_dir / "some-file"
+
+            self.shell.mkdir(remote_path=remote_dir)
+            self.shell.write_text(remote_path=remote_pth_to_file, text="zdravo")
+
+            self.shell.sync_to_remote(local_path=local_dir, remote_path=remote_dir)
+
+            self.assertTrue(self.shell.exists(remote_path=remote_pth_to_file))
+            self.assertEqual("hello", self.shell.read_text(remote_path=remote_pth_to_file))
+
+    def test_files_differ_with_spaces(self):
+        with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
+                temppathlib.TemporaryDirectory() as local_tmpdir:
+            local_dir = local_tmpdir.path / "some dir"
+            local_pth_to_file = local_dir / "some file"
+            local_pth_to_file.parent.mkdir()
+            local_pth_to_file.write_text("hello")
+
+            remote_dir = remote_tmpdir.path / "some dir"
+            remote_pth_to_file = remote_dir / "some file"
 
             self.shell.mkdir(remote_path=remote_dir)
             self.shell.write_text(remote_path=remote_pth_to_file, text="zdravo")

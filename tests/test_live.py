@@ -4,6 +4,7 @@
 import hashlib
 import io
 import pathlib
+import platform
 import time
 import unittest
 import uuid
@@ -850,6 +851,8 @@ class TestSpurplusSyncToRemote(unittest.TestCase):
             self.assertTrue(self.shell.exists(remote_path=remote_pth_to_file))
             self.assertEqual("hello", self.shell.read_text(remote_path=remote_pth_to_file))
 
+    @unittest.skipIf(platform.system() == "Windows", "Symbolic links admin privileges on Windows; "
+                     "requesting admin privileges for unit testing is inappropriate.")
     def test_local_only_link(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
                 temppathlib.TemporaryDirectory() as local_tmpdir:
@@ -948,6 +951,8 @@ class TestSpurplusSyncToRemote(unittest.TestCase):
                 self.assertFalse(self.shell.exists(remote_path=remote_pth_to_dir))
                 self.assertFalse(self.shell.exists(remote_path=remote_pth_to_subdir))
 
+    @unittest.skipIf(platform.system() == "Windows", "os.chmod is not properly implemented in Windows; "
+                     "see https://stackoverflow.com/q/27500067")
     def test_preserve_permissions(self):
         with spurplus.TemporaryDirectory(shell=self.shell) as remote_tmpdir, \
                 temppathlib.TemporaryDirectory() as local_tmpdir:

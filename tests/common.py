@@ -4,7 +4,7 @@
 
 import os
 import pathlib
-import pwd
+import getpass
 from typing import Optional  # pylint: disable=unused-import
 
 import spur.ssh
@@ -34,7 +34,7 @@ def params_from_environ() -> Params:
         params.username = os.environ['TEST_SSH_USERNAME']
     else:
         # Get the current local username
-        params.username = pwd.getpwuid(os.getuid())[0]
+        params.username = getpass.getuser()
 
     if 'TEST_SSH_PASSWORD' in os.environ:
         params.password = str(os.environ['TEST_SSH_PASSWORD'])

@@ -1,3 +1,8 @@
+2.3.3
+=====
+* Fixed live tests for windows
+
+
 2.3.2
 =====
 * Added separate named temporary files for Windows compatibility

@@ -10,7 +10,7 @@ import icontract
 import paramiko
 import spur
 
-T = TypeVar('T')
+T = TypeVar('T')  # pylint: disable=invalid-name
 
 
 class ReconnectingSFTP:

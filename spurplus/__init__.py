@@ -1062,7 +1062,7 @@ class SshShell(icontract.DBC):
         self.close()
 
 
-class TemporaryDirectory(metaclass=icontract.DBCMeta):
+class TemporaryDirectory(metaclass=icontract.DBCMeta):  # type: ignore
     """Represent a remote temporary directory."""
 
     @icontract.require(lambda prefix: prefix is None or '/' not in prefix)

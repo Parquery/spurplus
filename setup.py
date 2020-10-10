@@ -17,18 +17,20 @@ with open(os.path.join(here, 'README.rst'), encoding='utf-8') as fid:
 
 setup(
     name='spurplus',
-    version='2.3.3',
+    version='2.3.4',  # Do not forget to update the changelog!
     description='Manage remote machines and file operations over SSH.',
     long_description=long_description,
     url='http://github.com/Parquery/spurplus',
     author='Marko Ristin',
     author_email='marko.ristin@gmail.com',
+    # yapf: disable
     classifiers=[
         'Development Status :: 5 - Production/Stable', 'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License', 'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6', 'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8'
     ],
+    # yapf: enable
     license='License :: OSI Approved :: MIT License',
     keywords='ssh sftp spur paramiko execute remote commands modify files',
     packages=find_packages(exclude=['tests']),

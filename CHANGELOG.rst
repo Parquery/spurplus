@@ -1,12 +1,14 @@
+2.3.4
+=====
+* Added support for Python 3.7 and 3.8, respectively.
+
 2.3.3
 =====
-* Fixed live tests for windows
-
+* Fixed live tests for Windows
 
 2.3.2
 =====
 * Added separate named temporary files for Windows compatibility
-
 
 2.3.1
 =====

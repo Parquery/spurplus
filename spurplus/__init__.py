@@ -1047,11 +1047,12 @@ class SshShell(icontract.DBC):
 
     def close(self) -> None:
         """Close the underlying spur shell and SFTP (if ``close_spur_shell`` and ``close_sftp``, respectively)."""
-        if self.close_spur_shell:
-            self._spur.__exit__()
-
-        if self.close_sftp:
-            self._sftp.close()
+        try:
+            if self.close_spur_shell:
+                self._spur.close()
+        finally:
+            if self.close_sftp:
+                self._sftp.close()
 
     def __enter__(self) -> 'SshShell':
         """Enter the context and give the shell prepared in the constructor."""

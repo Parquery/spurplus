@@ -1,3 +1,8 @@
+2.3.5
+=====
+* Upgrade spur version to 0.3.23, so spurplus can install with paramiko 3.x.
+
+
 2.3.4
 =====
 * Added support for Python 3.7 and 3.8, respectively.
